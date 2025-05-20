@@ -22,7 +22,7 @@ logger = logging.getLogger("gym_bot")
 logger.setLevel(logging.INFO)
 
 # ─── PROMPT CONFIG ────────────────────────────────────────────────────────────
-with open("prompts\prompt.json", "r", encoding="utf-8") as f:
+with open("prompts/prompt.json", "r", encoding="utf-8") as f:
     AGENT_ROLES = json.load(f)
 
 # ─── FASTAPI INIT ─────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ class AgentWrapper(RunnableLambda):
         super().__init__(lambda x: chain.invoke(x))
         self.chain = chain
 
-def build_agent(agent_type="roided_trump") -> AgentWrapper:
+def build_agent(agent_type="gym_trump") -> AgentWrapper:
     system_msg = AGENT_ROLES[agent_type]
     prompt = ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template(system_msg),
