@@ -37,7 +37,7 @@ app.add_middleware(
 
 # ─── LLM + MEMORY ─────────────────────────────────────────────────────────────
 memory = ConversationBufferMemory(return_messages=True)
-llm = ChatOpenAI(model="gpt-4o", temperature=0.9)
+llm = ChatOpenAI(model="gpt-4o-mini", max_tokens=1024, temperature=0.9)
 
 class AgentWrapper(RunnableLambda):
     def __init__(self, chain):
