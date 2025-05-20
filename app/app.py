@@ -87,8 +87,3 @@ async def chat(req: ChatRequest):
     except Exception as e:
         logger.error(f"☠️ Chat error: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
-
-# ─── HEALTHCHECK ROUTE ────────────────────────────────────────────────────────
-@app.get("/")
-async def healthcheck():
-    return {"status": "ok", "message": "The Gym Bot is running 🏋️"}
