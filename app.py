@@ -22,7 +22,7 @@ logger = logging.getLogger("gym_bot")
 logger.setLevel(logging.INFO)
 
 # ─── PROMPT CONFIG ────────────────────────────────────────────────────────────
-with open("prompts\prompt.json", "r", encoding="utf-8") as f:
+with open("prompts/prompt.json", "r", encoding="utf-8") as f:
     AGENT_ROLES = json.load(f)
 
 # ─── FASTAPI INIT ─────────────────────────────────────────────────────────────
