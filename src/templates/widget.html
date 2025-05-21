@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Gym Bot Chat Widget</title>
   <style>
-    /* === WIDGET CONTAINER === */
     #gym-chat-widget {
       position: fixed;
       bottom: 32px;
@@ -14,10 +13,10 @@
       z-index: 9999;
       font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
     }
 
-    /* === OPEN BUTTON === */
     #gym-chat-button {
       width: 64px;
       height: 64px;
@@ -25,9 +24,14 @@
       background: url("{{ img_uri }}") no-repeat center/cover;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       cursor: pointer;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
     }
 
-    /* === CHAT PANEL === */
+    #gym-chat-button.hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
     #gym-chat-panel {
       display: none;
       flex-direction: column;
@@ -40,7 +44,6 @@
       overflow: hidden;
     }
 
-    /* === HEADER === */
     #gym-chat-header {
       display: flex;
       align-items: center;
@@ -50,6 +53,7 @@
       font-weight: bold;
       font-size: 16px;
     }
+
     #gym-chat-header img {
       width: 48px;
       height: 48px;
@@ -58,7 +62,6 @@
       flex-shrink: 0;
     }
 
-    /* === MESSAGES === */
     #gym-chat-messages-container {
       flex: 1;
       padding: 10px;
@@ -66,6 +69,7 @@
       background: #111;
       color: #fff;
     }
+
     .msg {
       margin: 10px 0;
       max-width: 80%;
@@ -74,11 +78,13 @@
       font-size: 15px;
       line-height: 1.4;
     }
+
     .msg.bot {
       background: #f1c40f;
       color: #000;
       align-self: flex-start;
     }
+
     .msg.user {
       background: #333;
       color: #fff;
@@ -86,7 +92,6 @@
       text-align: right;
     }
 
-    /* === TYPING INDICATOR === */
     #typing-indicator {
       font-style: italic;
       font-size: 12px;
@@ -95,7 +100,6 @@
       display: none;
     }
 
-    /* === INPUT AREA === */
     #gym-chat-input {
       display: flex;
       flex-direction: column;
@@ -103,6 +107,7 @@
       background: #000;
       padding: 16px;
     }
+
     #gym-chat-input input {
       border: none;
       padding: 14px;
@@ -111,6 +116,7 @@
       margin-bottom: 8px;
       background: #fff;
     }
+
     #gym-chat-send {
       border: none;
       background: #f1c40f;
@@ -122,6 +128,7 @@
       border-radius: 4px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
+
     #gym-chat-clear {
       background: transparent;
       color: #fff;
@@ -149,7 +156,6 @@
         <button id="gym-chat-clear">Clear</button>
       </div>
     </div>
-    <!-- No second avatar shown when chat is open -->
     <div id="gym-chat-button" aria-label="Open chat"></div>
   </div>
 
@@ -168,6 +174,7 @@
       function togglePanel() {
         const isVisible = panel.style.display === "flex";
         panel.style.display = isVisible ? "none" : "flex";
+        button.classList.toggle("hidden", !isVisible);
         if (!isVisible) {
           input.focus();
           messages.scrollTop = messages.scrollHeight;
