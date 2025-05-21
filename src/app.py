@@ -1,12 +1,14 @@
 import json
 import logging
+import os
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from langchain.memory import ConversationBufferMemory
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_openai import ChatOpenAI
 from langchain.prompts import (
     ChatPromptTemplate,
@@ -14,7 +16,6 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
     MessagesPlaceholder,
 )
-from langchain_core.runnables import RunnableLambda
 
 # ─── ENV + LOGGING ────────────────────────────────────────────────────────────
 load_dotenv()
@@ -22,12 +23,12 @@ logger = logging.getLogger("gym_bot")
 logger.setLevel(logging.INFO)
 
 # ─── PROMPT CONFIG ────────────────────────────────────────────────────────────
-with open("prompts/prompt.json", "r", encoding="utf-8") as f:
+PROMPT_PATH = os.path.join(os.path.dirname(__file__), "prompts", "prompt.json")
+with open(PROMPT_PATH, "r", encoding="utf-8") as f:
     AGENT_ROLES = json.load(f)
 
 # ─── FASTAPI INIT ─────────────────────────────────────────────────────────────
 app = FastAPI(title="The Gym Bot (Text Only)")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,25 +37,16 @@ app.add_middleware(
 )
 
 # ─── LLM + MEMORY ─────────────────────────────────────────────────────────────
-memory = ConversationBufferMemory(return_messages=True)
+memory = InMemoryChatMessageHistory(return_messages=True)
 llm = ChatOpenAI(model="gpt-4o-mini", max_tokens=1024, temperature=0.9)
 
-class AgentWrapper(RunnableLambda):
-    def __init__(self, chain):
-        super().__init__(lambda x: chain.invoke(x))
-        self.chain = chain
-
-def build_agent(agent_type="gym_trump") -> AgentWrapper:
-    system_msg = AGENT_ROLES[agent_type]
-    prompt = ChatPromptTemplate.from_messages([
-        SystemMessagePromptTemplate.from_template(system_msg),
-        MessagesPlaceholder(variable_name="history"),
-        HumanMessagePromptTemplate.from_template("{user_input}")
-    ])
-    chain = prompt | llm
-    return AgentWrapper(chain=chain)
-
-agent = build_agent()
+# Prepare prompt chain once
+prompt_template = ChatPromptTemplate.from_messages([
+    SystemMessagePromptTemplate.from_template(AGENT_ROLES["gym_trump"]),
+    MessagesPlaceholder(variable_name="history"),
+    HumanMessagePromptTemplate.from_template("{user_input}")
+])
+chain = prompt_template | llm
 
 # ─── REQUEST MODEL ────────────────────────────────────────────────────────────
 class ChatRequest(BaseModel):
@@ -65,25 +57,37 @@ class ChatRequest(BaseModel):
 @app.post("/chat")
 async def chat(req: ChatRequest):
     try:
-        mem_vars = memory.load_memory_variables({})
-        mem_vars["history"] = req.history
-
-        output = agent.invoke({
-            "user_input": req.user_input,
-            "history": mem_vars["history"]
-        })
-        reply = output.content.strip()
-
-        memory.save_context(
-            {"user": req.user_input},
-            {"assistant": reply}
-        )
-
-        return JSONResponse({
-            "reply": reply,
-            "history": memory.load_memory_variables({})["history"]
-        })
-
+        history = req.history or []
+        # Invoke chain directly
+        result = chain.invoke({"user_input": req.user_input, "history": history})
+        reply = result.content.strip()
+        # Update memory
+        memory.add_user_message(req.user_input)
+        memory.add_ai_message(reply)
+        return JSONResponse({"reply": reply, "history": memory.messages})
     except Exception as e:
         logger.error(f"☠️ Chat error: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+# ─── CLI SANITY TEST ───────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    print("\n⚡ Gym Bot CLI Test (type 'exit' to quit)\n")
+    history = []
+    while True:
+        try:
+            user_input = input("You: ").strip()
+            if user_input.lower() in ("exit", "quit"):
+                print("⚡ Bye.")
+                sys.exit(0)
+            result = chain.invoke({"user_input": user_input, "history": history})
+            reply = result.content.strip()
+            print("Bot:", reply)
+            memory.add_user_message(user_input)
+            memory.add_ai_message(reply)
+            history = memory.messages
+        except KeyboardInterrupt:
+            print("\n⚡ Interrupted. Exiting.")
+            sys.exit(0)
+        except Exception as e:
+            logger.error(f"☠️ CLI error: {e}", exc_info=True)
+            print("Error:", e)
