@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sys
+import argparse
 import base64
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -83,20 +84,85 @@ async def widget(request: Request):
 <head>
 <meta charset='UTF-8'/>
 <style>
-  /* Widget CSS omitted for brevity; use same CSS from /widget HTML */
+  #gym-chat-widget { position: fixed; bottom: 24px; right: 24px; z-index:9999; font-family: sans-serif; }
+  #gym-chat-button { width:60px; height:60px; border-radius:50%; background:url('{IMG_URI}') no-repeat center/cover; box-shadow:0 4px 12px rgba(0,0,0,0.2); cursor:pointer; }
+  #gym-chat-panel { display:none; flex-direction:column; width:320px; height:420px; background:#fff; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.2); overflow:hidden; margin-bottom:12px; }
+  #gym-chat-header { display:flex; align-items:center; padding:8px; background:#333; color:#fff; }
+  #gym-chat-header img { width:32px; height:32px; border-radius:50%; margin-right:8px; }
+  #gym-chat-messages { flex:1; padding:8px; overflow-y:auto; background:#f5f5f5; font-size:14px; }
+  .msg { margin-bottom:12px; }
+  .msg.user { text-align:right; }
+  .msg.bot  { text-align:left; }
+  #gym-chat-input { display:flex; border-top:1px solid #ddd; }
+  #gym-chat-input input { flex:1; border:none; padding:8px; font-size:14px; }
+  #gym-chat-input button { border:none; background:#333; color:#fff; padding:0 16px; cursor:pointer; }
 </style>
 </head>
 <body>
 <div id='gym-chat-widget'>
-  <!-- HTML structure with IMG_URI inserted -->
+  <div id='gym-chat-panel'>
+    <div id='gym-chat-header'>
+      <img src='{IMG_URI}' alt='Bot'/>
+      <strong>The Gym Bot</strong>
+    </div>
+    <div id='gym-chat-messages'></div>
+    <div id='gym-chat-input'>
+      <input type='text' id='gym-chat-text' placeholder='Type your message…'/>
+      <button id='gym-chat-send'>Send</button>
+    </div>
+  </div>
+  <div id='gym-chat-button'></div>
 </div>
 <script>
-  /* JS logic unchanged, pointing to {host}/chat */
+(function(){
+  const CHAT_URL = '{host}/chat';
+  const panel = document.getElementById('gym-chat-panel');
+  const button = document.getElementById('gym-chat-button');
+  const messages = document.getElementById('gym-chat-messages');
+  const input = document.getElementById('gym-chat-text');
+  const send = document.getElementById('gym-chat-send');
+  let history = [];
+
+  button.onclick = () => {
+    panel.style.display = panel.style.display==='flex' ? 'none' : 'flex';
+    if(panel.style.display==='flex') { input.focus(); messages.scrollTop = messages.scrollHeight; }
+  };
+
+  function renderMsg(text, cls) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + cls;
+    div.innerText = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  async function postMessage() {
+    const txt = input.value.trim();
+    if(!txt) return;
+    renderMsg(txt, 'user');
+    input.value = '';
+    history.push({role:'user', content: txt});
+    try {
+      const res = await fetch(CHAT_URL, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ user_input: txt, history })
+      });
+      const data = await res.json();
+      renderMsg(data.reply, 'bot');
+      history = data.history;
+    } catch(e) {
+      renderMsg('⚠️ Error contacting bot.', 'bot');
+      console.error(e);
+    }
+  }
+
+  send.onclick = postMessage;
+  input.addEventListener('keypress', e => { if(e.key==='Enter') postMessage(); });
+})();
 </script>
-</body>
-</html>
 """
-    return HTMLResponse(content=html)
+    return HTMLResponse(content=html, status_code=200)
 
 # ─── CLI SANITY TEST ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
@@ -105,7 +171,8 @@ if __name__ == "__main__":
     while True:
         try:
             text = input("You: ").strip()
-            if text.lower() in ("exit", "quit"): sys.exit(0)
+            if text.lower() in ("exit", "quit"):
+                sys.exit(0)
             res = chain.invoke({"user_input": text, "history": history})
             reply = res.content.strip()
             print("Bot:", reply)
