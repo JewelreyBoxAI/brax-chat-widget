@@ -21,16 +21,19 @@ from langchain.prompts import (
 )
 
 # ─── ENV + LOGGING ───────────────────────────────────────────────────────────
+
 load_dotenv()
 logger = logging.getLogger("gym_bot")
 logger.setLevel(logging.INFO)
 
 # ─── PATHS & TEMPLATES ────────────────────────────────────────────────────────
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(ROOT, "templates")
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 # ─── LOAD PROMPT CONFIG ───────────────────────────────────────────────────────
+
 prompt_file = os.path.join(ROOT, "prompts", "prompt.json")
 try:
     with open(prompt_file, "r", encoding="utf-8") as f:
@@ -50,6 +53,7 @@ else:
     IMG_URI = "https://via.placeholder.com/60x60.png?text=Bot"
 
 # ─── FASTAPI SETUP ───────────────────────────────────────────────────────────
+
 app = FastAPI(title="The Gym Bot (Text Only)")
 app.add_middleware(
     CORSMiddleware,
@@ -58,8 +62,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 # ─── LLM + MEMORY ─────────────────────────────────────────────────────────────
+
 memory = InMemoryChatMessageHistory(return_messages=True)
 llm = ChatOpenAI(model="gpt-4o-mini", max_tokens=1024, temperature=0.9)
 prompt_template = ChatPromptTemplate.from_messages([
@@ -70,17 +74,20 @@ prompt_template = ChatPromptTemplate.from_messages([
 chain = prompt_template | llm
 
 # ─── REQUEST MODEL ────────────────────────────────────────────────────────────
+
 class ChatRequest(BaseModel):
     user_input: str
     history: list
 
 # ─── ROOT REDIRECT ───────────────────────────────────────────────────────────
+
 @app.get("/")
 async def root():
     """Redirect root URL to the widget"""
     return RedirectResponse(url="/widget")
 
 # ─── CHAT ENDPOINT ───────────────────────────────────────────────────────────
+
 @app.post("/chat")
 async def chat(req: ChatRequest):
     try:
@@ -95,6 +102,7 @@ async def chat(req: ChatRequest):
         return JSONResponse(status_code=500, content={"error": "An internal error occurred. Please try again later."})
 
 # ─── WIDGET ENDPOINT ─────────────────────────────────────────────────────────
+
 @app.get("/widget", response_class=HTMLResponse)
 async def widget(request: Request):
     """Render the chat widget UI"""
@@ -108,6 +116,7 @@ async def widget(request: Request):
     )
 
 # ─── CLI SANITY TEST ───────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     print("Gym Bot CLI Test (type 'exit')")
     history = []
