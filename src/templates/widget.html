@@ -1,147 +1,148 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Gym Bot Chat Widget</title>
   <style>
-    /* === CHAT WIDGET CONTAINER === */
     #gym-chat-widget {
       position: fixed;
       bottom: 32px;
       right: 32px;
-      padding: 16px; /* Outer spacing */
+      left: 0;
+      margin: auto;
       z-index: 9999;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-      font-size: 16px;
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      display: flex;
+      justify-content: center;
     }
 
-    /* === CHAT BUTTON === */
     #gym-chat-button {
-      width: 60px;
-      height: 60px;
+      width: 64px;
+      height: 64px;
       border-radius: 50%;
       background: url("{{ img_uri }}") no-repeat center/cover;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       cursor: pointer;
-      transition: transform 0.2s ease-in-out;
-    }
-    #gym-chat-button:hover {
-      transform: scale(1.05);
     }
 
-    /* === CHAT PANEL === */
     #gym-chat-panel {
       display: none;
       flex-direction: column;
       width: 320px;
       max-width: 90vw;
-      height: 420px;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      height: 480px;
+      background: #000;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
       overflow: hidden;
-      margin-bottom: 12px;
-      padding: 16px; /* Inner spacing */
-      transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-    }
-    #gym-chat-panel.show {
-      display: flex;
-      opacity: 1;
-      transform: translateY(0);
     }
 
-    /* === CHAT HEADER === */
     #gym-chat-header {
       display: flex;
       align-items: center;
-      padding: 8px;
-      background: #333;
-      color: #fff;
+      padding: 12px;
+      background: #f1c40f;
+      color: #000;
       font-weight: bold;
+      font-size: 16px;
     }
     #gym-chat-header img {
-      width: 32px;
-      height: 32px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      margin-right: 8px;
+      margin-right: 10px;
     }
 
-    /* === MESSAGE AREA === */
     #gym-chat-messages-container {
       flex: 1;
-      padding: 12px;
+      padding: 10px;
       overflow-y: auto;
-      background: #f5f5f5;
-      font-size: 16px;
-      scroll-behavior: smooth;
+      background: #111;
+      color: #fff;
     }
     .msg {
-      margin-bottom: 12px;
-      word-wrap: break-word;
+      margin: 10px 0;
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 20px;
+      font-size: 15px;
       line-height: 1.4;
     }
-    .msg.user {
-      text-align: right;
-      color: #007bff;
-    }
     .msg.bot {
-      text-align: left;
-      color: #333;
+      background: #f1c40f;
+      color: #000;
+      align-self: flex-start;
+    }
+    .msg.user {
+      background: #333;
+      color: #fff;
+      align-self: flex-end;
+      text-align: right;
     }
 
-    /* === TYPING INDICATOR === */
     #typing-indicator {
       font-style: italic;
       font-size: 12px;
-      color: #555;
-      padding: 0 12px 12px 12px;
+      color: #aaa;
+      padding: 0 14px 6px;
       display: none;
     }
 
-    /* === INPUT BAR === */
     #gym-chat-input {
       display: flex;
-      border-top: 1px solid #ddd;
-      background: #fff;
+      flex-direction: column;
+      border-top: 1px solid #222;
+      background: #000;
+      padding: 12px;
     }
     #gym-chat-input input {
-      flex: 1;
       border: none;
       padding: 12px;
-      font-size: 14px;
-      outline: none;
+      font-size: 15px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      background: #fff;
     }
-    #gym-chat-input button {
+    #gym-chat-send {
       border: none;
-      background: #333;
-      color: #fff;
-      padding: 0 16px;
+      background: #f1c40f;
+      color: #000;
+      padding: 10px;
+      font-weight: bold;
+      font-size: 15px;
       cursor: pointer;
-      font-size: 14px;
-      transition: background-color 0.2s ease-in-out;
+      border-radius: 4px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
-    #gym-chat-input button:hover {
-      background-color: #555;
+    #gym-chat-clear {
+      background: transparent;
+      color: #fff;
+      border: 1px solid #fff;
+      padding: 6px;
+      font-size: 13px;
+      margin-top: 6px;
+      border-radius: 4px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
   <div id="gym-chat-widget">
-    <div id="gym-chat-panel" role="dialog" aria-label="Chat with The Gym Bot">
+    <div id="gym-chat-panel">
       <div id="gym-chat-header">
-        <img src="{{ img_uri }}" alt="Bot avatar image" />
-        <strong>The Gym Bot</strong>
+        <img src="{{ img_uri }}" alt="Bot Avatar">
+        The Gym Bot
       </div>
       <div id="gym-chat-messages-container" aria-live="polite"></div>
-      <div id="typing-indicator">Typing...</div>
+      <div id="typing-indicator">Trump is typing...</div>
       <div id="gym-chat-input">
-        <input type="text" id="gym-chat-text" placeholder="Type your message…" aria-label="Message input" />
-        <button id="gym-chat-send" aria-label="Send message">Send</button>
-        <button id="gym-chat-clear" aria-label="Clear chat history">Clear</button>
+        <input type="text" id="gym-chat-text" placeholder="Type your message…">
+        <button id="gym-chat-send">Send</button>
+        <button id="gym-chat-clear">Clear</button>
       </div>
     </div>
-    <div id="gym-chat-button" aria-label="Open chat" role="button" tabindex="0"></div>
+    <div id="gym-chat-button" aria-label="Open chat"></div>
   </div>
 
   <script>
@@ -149,21 +150,24 @@
       const CHAT_URL = "{{ chat_url }}";
       const panel = document.getElementById("gym-chat-panel");
       const button = document.getElementById("gym-chat-button");
-      const messagesContainer = document.getElementById("gym-chat-messages-container");
+      const messages = document.getElementById("gym-chat-messages-container");
       const input = document.getElementById("gym-chat-text");
       const send = document.getElementById("gym-chat-send");
       const clear = document.getElementById("gym-chat-clear");
-      const typingIndicator = document.getElementById("typing-indicator");
+      const typing = document.getElementById("typing-indicator");
       let history = JSON.parse(localStorage.getItem("gym_bot_history")) || [];
 
       function togglePanel() {
-        panel.classList.toggle("show");
-        input.focus();
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        const isVisible = panel.style.display === "flex";
+        panel.style.display = isVisible ? "none" : "flex";
+        if (!isVisible) {
+          input.focus();
+          messages.scrollTop = messages.scrollHeight;
+        }
       }
 
       function escapeHTML(str) {
-        const div = document.createElement("div");
+        const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
       }
@@ -172,18 +176,17 @@
         const div = document.createElement("div");
         div.className = "msg " + cls;
         div.innerHTML = escapeHTML(text);
-        messagesContainer.appendChild(div);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        messages.appendChild(div);
+        messages.scrollTop = messages.scrollHeight;
       }
 
       function showTyping(show) {
-        typingIndicator.style.display = show ? "block" : "none";
+        typing.style.display = show ? "block" : "none";
       }
 
       async function postMessage() {
         const txt = input.value.trim();
         if (!txt) return;
-
         renderMsg(txt, "user");
         input.value = "";
         history.push({ role: "user", content: txt });
@@ -193,21 +196,14 @@
           const res = await fetch(CHAT_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_input: txt, history: history })
+            body: JSON.stringify({ user_input: txt, history })
           });
-
-          if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(`API Error: ${res.status} - ${errorData.error || res.statusText}`);
-          }
-
           const data = await res.json();
           renderMsg(data.reply, "bot");
           history = data.history;
           localStorage.setItem("gym_bot_history", JSON.stringify(history));
         } catch (e) {
-          console.error("⚠️ Error contacting bot:", e);
-          renderMsg(`⚠️ Error contacting bot: ${e.message || "Please try again."}`, "bot");
+          renderMsg("⚠️ Error contacting bot.", "bot");
         } finally {
           showTyping(false);
         }
@@ -216,26 +212,16 @@
       function clearChat() {
         history = [];
         localStorage.removeItem("gym_bot_history");
-        messagesContainer.innerHTML = "";
+        messages.innerHTML = "";
       }
 
-      // Attach listeners
       button.onclick = togglePanel;
-      button.addEventListener("keypress", (e) => {
-        if (e.key === "Enter" || e.key === " ") togglePanel();
-      });
       send.onclick = postMessage;
-      input.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") {
-          postMessage();
-          e.preventDefault();
-        }
-      });
       clear.onclick = clearChat;
-
-      // Restore saved history
+      input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") postMessage();
+      });
       history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "bot"));
-      button.setAttribute("aria-expanded", "false");
     })();
   </script>
 </body>
