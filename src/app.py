@@ -112,6 +112,24 @@ async def chat(req: ChatRequest):
             content={"error": "An internal error occurred. Please try again later."}
         )
 
+# ─── CLEAR CHAT ENDPOINT ──────────────────────────────────────────────────────
+
+@app.post("/clear_chat")
+async def clear_chat():
+    """
+    Clear in-memory chat history for all users (global reset).
+    Note: This affects all sessions since memory is global.
+    """
+    try:
+        memory.clear()
+        return JSONResponse({"status": "ok", "message": "Chat history cleared."})
+    except Exception as e:
+        logger.error(f"Error clearing chat history: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to clear chat history."}
+        )
+
 # ─── WIDGET ENDPOINT ─────────────────────────────────────────────────────────
 
 @app.get("/widget", response_class=HTMLResponse)
