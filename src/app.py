@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 # LangChain imports
 from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.messages import BaseMessage
 from langchain_openai import ChatOpenAI
 from langchain.prompts import (
     ChatPromptTemplate,
@@ -88,6 +89,9 @@ async def root():
 
 # ─── CHAT ENDPOINT ───────────────────────────────────────────────────────────
 
+def serialize_messages(messages: list[BaseMessage]):
+    return [{"role": msg.type, "content": msg.content} for msg in messages]
+
 @app.post("/chat")
 async def chat(req: ChatRequest):
     try:
@@ -96,10 +100,16 @@ async def chat(req: ChatRequest):
         reply = res.content.strip()
         memory.add_user_message(req.user_input)
         memory.add_ai_message(reply)
-        return JSONResponse({"reply": reply, "history": memory.messages})
+        return JSONResponse({
+            "reply": reply,
+            "history": serialize_messages(memory.messages)
+        })
     except Exception as e:
         logger.error(f"Error in /chat: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"error": "An internal error occurred. Please try again later."})
+        return JSONResponse(
+            status_code=500,
+            content={"error": "An internal error occurred. Please try again later."}
+        )
 
 # ─── WIDGET ENDPOINT ─────────────────────────────────────────────────────────
 
