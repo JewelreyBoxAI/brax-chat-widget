@@ -13,6 +13,9 @@ venv/
 # VSCode
 .vscode/
 
+# VSCode workspace
+The-Gym Chatbot.code-workspace
+
 # Docker
 *.log
 docker-compose.override.yml
