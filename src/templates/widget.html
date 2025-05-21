@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <style>
-    /* Widget container */
     #gym-chat-widget {
       position: fixed;
       bottom: 24px;
@@ -11,7 +10,6 @@
       z-index: 9999;
       font-family: sans-serif;
     }
-    /* Floating avatar button */
     #gym-chat-button {
       width: 60px;
       height: 60px;
@@ -20,11 +18,11 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       cursor: pointer;
     }
-    /* Chat window */
     #gym-chat-panel {
       display: none;
       flex-direction: column;
       width: 320px;
+      max-width: 90vw;
       height: 420px;
       background: #fff;
       border-radius: 8px;
@@ -32,7 +30,6 @@
       overflow: hidden;
       margin-bottom: 12px;
     }
-    /* Header */
     #gym-chat-header {
       display: flex;
       align-items: center;
@@ -46,7 +43,6 @@
       border-radius: 50%;
       margin-right: 8px;
     }
-    /* Message area */
     #gym-chat-messages {
       flex: 1;
       padding: 8px;
@@ -56,6 +52,7 @@
     }
     .msg {
       margin-bottom: 12px;
+      word-wrap: break-word;
     }
     .msg.user {
       text-align: right;
@@ -63,7 +60,6 @@
     .msg.bot {
       text-align: left;
     }
-    /* Input */
     #gym-chat-input {
       display: flex;
       border-top: 1px solid #ddd;
@@ -81,26 +77,29 @@
       padding: 0 16px;
       cursor: pointer;
     }
+    #typing-indicator {
+      font-style: italic;
+      font-size: 12px;
+      color: #555;
+      padding: 0 8px;
+    }
   </style>
 </head>
 <body>
   <div id="gym-chat-widget">
-    <div id="gym-chat-panel">
+    <div id="gym-chat-panel" role="dialog" aria-label="Chat with The Gym Bot">
       <div id="gym-chat-header">
-        <img src="{{ img_uri }}" alt="Bot" />
+        <img src="{{ img_uri }}" alt="Bot avatar image" />
         <strong>The Gym Bot</strong>
       </div>
       <div id="gym-chat-messages"></div>
+      <div id="gym-chat-messages" aria-live="polite"></div>
       <div id="gym-chat-input">
-        <input
-          type="text"
-          id="gym-chat-text"
-          placeholder="Type your message…"
-        />
-        <button id="gym-chat-send">Send</button>
+        <input type="text" id="gym-chat-text" placeholder="Type your message…" aria-label="Message input" />
+        <button id="gym-chat-send" aria-label="Send message">Send</button>
       </div>
     </div>
-    <div id="gym-chat-button"></div>
+    <div id="gym-chat-button" aria-label="Open chat"></div>
   </div>
   <script>
     (function () {
@@ -110,57 +109,69 @@
       const messages = document.getElementById("gym-chat-messages");
       const input = document.getElementById("gym-chat-text");
       const send = document.getElementById("gym-chat-send");
-      let history = [];
+      const typing = document.getElementById("typing-indicator");
+      let history = JSON.parse(localStorage.getItem("gym_bot_history")) || [];
 
-      // Toggle panel
-      button.onclick = () => {
+      function togglePanel() {
         panel.style.display = panel.style.display === "flex" ? "none" : "flex";
         if (panel.style.display === "flex") {
           input.focus();
           messages.scrollTop = messages.scrollHeight;
         }
-      };
+      }
 
-      // Render message
+      function escapeHTML(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
       function renderMsg(text, cls) {
         const div = document.createElement("div");
         div.className = "msg " + cls;
-        div.innerText = text;
+        div.innerHTML = escapeHTML(text);
         messages.appendChild(div);
         messages.scrollTop = messages.scrollHeight;
       }
 
-      // Send message
+      function showTyping(show) {
+        typing.style.display = show ? "block" : "none";
+      }
+
       async function postMessage() {
         const txt = input.value.trim();
         if (!txt) return;
         renderMsg(txt, "user");
         input.value = "";
         history.push({ role: "user", content: txt });
+        showTyping(true);
         try {
           const res = await fetch(CHAT_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_input: txt, history }),
+            body: JSON.stringify({ user_input: txt, history })
           });
           const data = await res.json();
           renderMsg(data.reply, "bot");
           history = data.history;
+          localStorage.setItem("gym_bot_history", JSON.stringify(history));
         } catch (e) {
-          renderMsg("⚠️ Error contacting bot.", "bot");
+          renderMsg("⚠️ Error contacting bot. Please try again.", "bot");
           console.error(e);
+        } finally {
+          showTyping(false);
         }
       }
 
+      button.onclick = togglePanel;
       send.onclick = postMessage;
       input.addEventListener("keypress", (e) => {
         if (e.key === "Enter") postMessage();
       });
+
+      // Restore previous session
+      history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "bot"));
     })();
   </script>
 </body>
 </html>
-<!--
-  This HTML template is for a chat widget that allows users to interact with a bot.
-  It includes styles for the widget, chat panel, messages, and input area.
-  The JavaScript handles the functionality of sending messages and receiving replies.

@@ -32,22 +32,32 @@ templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 # ─── LOAD PROMPT CONFIG ───────────────────────────────────────────────────────
 prompt_file = os.path.join(ROOT, "prompts", "prompt.json")
-with open(prompt_file, "r", encoding="utf-8") as f:
-    AGENT_ROLES = json.load(f)
+try:
+    with open(prompt_file, "r", encoding="utf-8") as f:
+        AGENT_ROLES = json.load(f)
+except FileNotFoundError:
+    logger.error(f"Prompt file not found at {prompt_file}")
+    sys.exit("Prompt configuration is missing. Aborting startup.")
 
 # ─── ENCODE AVATAR IMAGE ──────────────────────────────────────────────────────
+
 img_path = os.path.join(ROOT, "images", "trump.png")
-with open(img_path, "rb") as img:
-    IMG_URI = "data:image/png;base64," + base64.b64encode(img.read()).decode()
+if os.path.exists(img_path):
+    with open(img_path, "rb") as img:
+        IMG_URI = "data:image/png;base64," + base64.b64encode(img.read()).decode()
+else:
+    logger.warning(f"Image not found at {img_path}, using fallback.")
+    IMG_URI = "https://via.placeholder.com/60x60.png?text=Bot"
 
 # ─── FASTAPI SETUP ───────────────────────────────────────────────────────────
 app = FastAPI(title="The Gym Bot (Text Only)")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("ALLOWED_ORIGINS", "").split(","),
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
 
 # ─── LLM + MEMORY ─────────────────────────────────────────────────────────────
 memory = InMemoryChatMessageHistory(return_messages=True)
@@ -82,7 +92,7 @@ async def chat(req: ChatRequest):
         return JSONResponse({"reply": reply, "history": memory.messages})
     except Exception as e:
         logger.error(f"Error in /chat: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred. Please try again later."})
 
 # ─── WIDGET ENDPOINT ─────────────────────────────────────────────────────────
 @app.get("/widget", response_class=HTMLResponse)
