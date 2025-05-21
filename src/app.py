@@ -67,8 +67,9 @@ app.add_middleware(
 
 memory = InMemoryChatMessageHistory(return_messages=True)
 llm = ChatOpenAI(model="gpt-4o-mini", max_tokens=1024, temperature=0.9)
+prompt_text = " ".join(AGENT_ROLES["gym_trump"]) if isinstance(AGENT_ROLES["gym_trump"], list) else AGENT_ROLES["gym_trump"]
 prompt_template = ChatPromptTemplate.from_messages([
-    SystemMessagePromptTemplate.from_template(AGENT_ROLES["gym_trump"]),
+    SystemMessagePromptTemplate.from_template(prompt_text),
     MessagesPlaceholder(variable_name="history"),
     HumanMessagePromptTemplate.from_template("{user_input}")
 ])
