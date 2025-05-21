@@ -5,7 +5,7 @@ import sys
 import base64
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -64,6 +64,12 @@ class ChatRequest(BaseModel):
     user_input: str
     history: list
 
+# ─── ROOT REDIRECT ───────────────────────────────────────────────────────────
+@app.get("/")
+async def root():
+    """Redirect root URL to the widget"""
+    return RedirectResponse(url="/widget")
+
 # ─── CHAT ENDPOINT ───────────────────────────────────────────────────────────
 @app.post("/chat")
 async def chat(req: ChatRequest):
@@ -79,14 +85,16 @@ async def chat(req: ChatRequest):
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 # ─── WIDGET ENDPOINT ─────────────────────────────────────────────────────────
-@app.get("/widget")
+@app.get("/widget", response_class=HTMLResponse)
 async def widget(request: Request):
-    """
-    Render the chat widget UI using a Jinja2 template.
-    """
+    """Render the chat widget UI"""
     return templates.TemplateResponse(
-        "widget.html", 
-        {"request": request, "chat_url": f"{request.url.scheme}://{request.url.netloc}/chat", "img_uri": IMG_URI}
+        "widget.html",
+        {
+            "request": request,
+            "chat_url": f"{request.url.scheme}://{request.url.netloc}/chat",
+            "img_uri": IMG_URI,
+        },
     )
 
 # ─── CLI SANITY TEST ───────────────────────────────────────────────────────────
