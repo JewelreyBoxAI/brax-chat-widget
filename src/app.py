@@ -45,7 +45,7 @@ except FileNotFoundError:
 
 # ─── ENCODE AVATAR IMAGE ──────────────────────────────────────────────────────
 
-img_path = os.path.join(ROOT, "images", "trump.png")
+img_path = os.path.join(ROOT, "images", "trump_close.png")
 if os.path.exists(img_path):
     with open(img_path, "rb") as img:
         IMG_URI = "data:image/png;base64," + base64.b64encode(img.read()).decode()
