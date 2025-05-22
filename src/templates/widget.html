@@ -18,8 +18,8 @@
     }
 
     #gym-chat-button {
-      width: 64px;
-      height: 64px;
+      width: 84px;
+      height: 84px;
       border-radius: 50%;
       background: url("{{ img_uri }}") no-repeat center/cover;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -62,10 +62,13 @@
       flex-shrink: 0;
     }
 
-    #gym-chat-messages-container {
+    #gym-chat-messages-container::-webkit-scrollbar {
+      display: none; /* Safari and Chrome */
       flex: 1;
       padding: 10px;
       overflow-y: auto;
+      scrollbar-width: none;           /* Firefox */
+      -ms-overflow-style: none;        /* Internet Explorer 10+ */
       background: #111;
       color: #fff;
     }
