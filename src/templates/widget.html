@@ -1,20 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>The Gym Bot Chat Widget</title>
   <style>
-    #gym-chat-widget {
-      position: fixed;
-      bottom: 32px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 9999;
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      height: 100% !important;
+      overflow: hidden;
+      box-sizing: border-box;
       font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    }
+
+    #gym-chat-widget {
+      width: 100%;
+      height: 100%;
       display: flex;
-      flex-direction: column;
-      align-items: center;
+      justify-content: center;
+      align-items: flex-end;
     }
 
     #gym-chat-button {
@@ -37,7 +42,8 @@
       flex-direction: column;
       width: 360px;
       max-width: 95vw;
-      height: 520px;
+      height: 100%;
+      max-height: 100vh;
       background: #000;
       border-radius: 10px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.6);
@@ -68,6 +74,12 @@
       overflow-y: auto;
       background: #111;
       color: #fff;
+      scrollbar-width: none;           /* Firefox */
+      -ms-overflow-style: none;        /* IE */
+    }
+
+    #gym-chat-messages-container::-webkit-scrollbar {
+      display: none;                   /* Chrome/Safari */
     }
 
     .msg {
