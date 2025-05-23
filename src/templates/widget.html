@@ -20,6 +20,7 @@
       display: flex;
       justify-content: center;
       align-items: flex-end;
+      flex-direction: column;
     }
 
     #gym-chat-button {
@@ -30,11 +31,28 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
       cursor: pointer;
       transition: opacity 0.3s ease, visibility 0.3s ease;
+      margin-top: 16px;
     }
 
     #gym-chat-button.hidden {
       opacity: 0;
       visibility: hidden;
+    }
+
+    #gym-chat-close {
+      display: none;
+      font-size: 36px;
+      color: rgba(255, 255, 255, 0.7);
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      text-align: center;
+      line-height: 44px;
+      cursor: pointer;
+      margin-top: 16px;
+      transition: opacity 0.3s ease;
     }
 
     #gym-chat-panel {
@@ -74,12 +92,12 @@
       overflow-y: auto;
       background: #111;
       color: #fff;
-      scrollbar-width: none;           /* Firefox */
-      -ms-overflow-style: none;        /* IE */
+      scrollbar-width: none;
+      -ms-overflow-style: none;
     }
 
     #gym-chat-messages-container::-webkit-scrollbar {
-      display: none;                   /* Chrome/Safari */
+      display: none;
     }
 
     .msg {
@@ -169,6 +187,7 @@
       </div>
     </div>
     <div id="gym-chat-button" aria-label="Open chat"></div>
+    <div id="gym-chat-close" aria-label="Close chat">×</div>
   </div>
 
   <script>
@@ -176,6 +195,7 @@
       const CHAT_URL = "{{ chat_url }}";
       const panel = document.getElementById("gym-chat-panel");
       const button = document.getElementById("gym-chat-button");
+      const closeBtn = document.getElementById("gym-chat-close");
       const messages = document.getElementById("gym-chat-messages-container");
       const input = document.getElementById("gym-chat-text");
       const send = document.getElementById("gym-chat-send");
@@ -187,6 +207,7 @@
         const isVisible = panel.style.display === "flex";
         panel.style.display = isVisible ? "none" : "flex";
         button.classList.toggle("hidden", !isVisible);
+        closeBtn.style.display = isVisible ? "none" : "block";
         if (!isVisible) {
           input.focus();
           messages.scrollTop = messages.scrollHeight;
@@ -243,6 +264,7 @@
       }
 
       button.onclick = togglePanel;
+      closeBtn.onclick = togglePanel;
       send.onclick = postMessage;
       clear.onclick = clearChat;
       input.addEventListener("keypress", (e) => {
