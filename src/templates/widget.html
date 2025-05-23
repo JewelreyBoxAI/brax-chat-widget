@@ -6,9 +6,9 @@
   <title>The Gym Bot Chat Widget</title>
   <style>
     html, body {
-      margin: 0 !important;
-      padding: 0 !important;
-      height: 100% !important;
+      margin: 0;
+      padding: 0;
+      height: 100%;
       overflow: hidden;
       box-sizing: border-box;
       font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
@@ -21,38 +21,38 @@
       justify-content: center;
       align-items: flex-end;
       flex-direction: column;
+      gap: 16px;
     }
 
-    #gym-chat-button {
+    #gym-chat-button,
+    #gym-chat-close {
       width: 84px;
       height: 84px;
       border-radius: 50%;
-      background: url("{{ img_uri }}") no-repeat center/cover;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       transition: opacity 0.3s ease, visibility 0.3s ease;
-      margin-top: 16px;
+    }
+
+    #gym-chat-button {
+      background: url("{{ img_uri }}") no-repeat center/cover;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    #gym-chat-close {
+      display: none;
+      background: rgba(0,0,0,0.5);
+      color: rgba(255,255,255,0.8);
+      font-size: 40px;
+      font-weight: bold;
+      border: 2px solid rgba(255,255,255,0.3);
     }
 
     #gym-chat-button.hidden {
       opacity: 0;
       visibility: hidden;
-    }
-
-    #gym-chat-close {
-      display: none;
-      font-size: 36px;
-      color: rgba(255, 255, 255, 0.7);
-      background: rgba(0, 0, 0, 0.5);
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 50%;
-      width: 48px;
-      height: 48px;
-      text-align: center;
-      line-height: 44px;
-      cursor: pointer;
-      margin-top: 16px;
-      transition: opacity 0.3s ease;
     }
 
     #gym-chat-panel {
@@ -186,6 +186,7 @@
         <button id="gym-chat-clear">Clear</button>
       </div>
     </div>
+
     <div id="gym-chat-button" aria-label="Open chat"></div>
     <div id="gym-chat-close" aria-label="Close chat">×</div>
   </div>
@@ -207,7 +208,7 @@
         const isVisible = panel.style.display === "flex";
         panel.style.display = isVisible ? "none" : "flex";
         button.classList.toggle("hidden", !isVisible);
-        closeBtn.style.display = isVisible ? "none" : "block";
+        closeBtn.style.display = isVisible ? "none" : "flex";
         if (!isVisible) {
           input.focus();
           messages.scrollTop = messages.scrollHeight;
