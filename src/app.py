@@ -211,11 +211,25 @@ async def chat(request: Request, req: ChatRequest):
             content={"error": str(ve)}
         )
     except Exception as e:
+        error_msg = str(e)
         logger.error(f"Error in /chat: {e}", exc_info=True)
-        return JSONResponse(
-            status_code=500,
-            content={"error": "An internal error occurred. Please try again later."}
-        )
+        
+        # Handle specific OpenAI API errors
+        if "401" in error_msg or "invalid_api_key" in error_msg.lower():
+            return JSONResponse(
+                status_code=500,
+                content={"error": "⚠️ API configuration issue. Please contact support or check your OpenAI API key."}
+            )
+        elif "rate_limit" in error_msg.lower():
+            return JSONResponse(
+                status_code=429,
+                content={"error": "⏱️ Too many requests. Please wait a moment and try again."}
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={"error": "An internal error occurred. Please try again later."}
+            )
 
 # ─── CLEAR CHAT ENDPOINT ──────────────────────────────────────────────────────
 
