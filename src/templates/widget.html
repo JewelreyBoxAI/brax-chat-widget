@@ -46,6 +46,9 @@
       cursor: pointer;
       transition: all 0.3s ease;
       animation: elegantPulse 3s ease-in-out infinite;
+      pointer-events: auto;
+      position: relative;
+      z-index: 1000;
     }
 
     @keyframes elegantPulse {
@@ -351,6 +354,7 @@
       }
 
       function togglePanel() {
+        console.log('Toggle panel clicked'); // Debug log
         const isVisible = panel.style.display === "flex";
         panel.style.display = isVisible ? "none" : "flex";
         button.classList.toggle("hidden", !isVisible);
@@ -438,9 +442,16 @@
         history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "consultant"));
       }
 
+      // Multiple event binding approaches for reliability
       button.onclick = togglePanel;
+      button.addEventListener('click', togglePanel, true);
+      button.addEventListener('touchstart', togglePanel, { passive: true });
+      
       send.onclick = postMessage;
+      send.addEventListener('click', postMessage);
+      
       clear.onclick = clearChat;
+      clear.addEventListener('click', clearChat);
       input.addEventListener("keypress", (e) => {
         if (e.key === "Enter") postMessage();
       });
