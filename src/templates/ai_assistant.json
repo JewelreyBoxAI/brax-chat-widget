@@ -1,0 +1,130 @@
+{
+  "nodes": [
+    {
+      "id": "node-chatinput",
+      "type": "ChatInput",
+      "data": {
+        "node": {
+          "display_name": "Chat Input"
+        }
+      },
+      "position": { "x": 50, "y": 50 }
+    },
+    {
+      "id": "node-voiceinput",
+      "type": "VoiceInputComponent",
+      "data": {
+        "node": {
+          "display_name": "Voice Input"
+        }
+      },
+      "position": { "x": 50, "y": 150 }
+    },
+    {
+      "id": "node-supervisor",
+      "type": "ToolCallingAgent",
+      "data": {
+        "node": {
+          "display_name": "Supervisor Agent",
+          "description": "Routes tasks based on intent"
+        }
+      },
+      "position": { "x": 250, "y": 100 }
+    },
+    {
+      "id": "node-scheduler",
+      "type": "GoogleCalendarAgent",
+      "data": {
+        "node": {
+          "display_name": "Scheduler Agent"
+        }
+      },
+      "position": { "x": 500, "y": 0 }
+    },
+    {
+      "id": "node-comm",
+      "type": "GmailAgent",
+      "data": {
+        "node": {
+          "display_name": "Communications Agent"
+        }
+      },
+      "position": { "x": 500, "y": 80 }
+    },
+    {
+      "id": "node-visual",
+      "type": "AuroraImageGenComponent",
+      "data": {
+        "node": {
+          "display_name": "Visual Synth Agent"
+        }
+      },
+      "position": { "x": 500, "y": 160 }
+    },
+    {
+      "id": "node-search",
+      "type": "DuckDuckGoSearchAgent",
+      "data": {
+        "node": {
+          "display_name": "Search Agent"
+        }
+      },
+      "position": { "x": 500, "y": 240 }
+    },
+    {
+      "id": "node-embed",
+      "type": "EmbeddingPipeline",
+      "data": {
+        "node": {
+          "display_name": "Embedding Pipeline"
+        }
+      },
+      "position": { "x": 700, "y": 100 }
+    },
+    {
+      "id": "node-vector",
+      "type": "VectorStore",
+      "data": {
+        "node": {
+          "display_name": "VectorStore"
+        }
+      },
+      "position": { "x": 900, "y": 100 }
+    },
+    {
+      "id": "node-output",
+      "type": "ChatOutput",
+      "data": {
+        "node": {
+          "display_name": "Chat Output"
+        }
+      },
+      "position": { "x": 1100, "y": 100 }
+    }
+  ],
+  "edges": [
+    { "source": "node-chatinput", "target": "node-supervisor" },
+    { "source": "node-voiceinput", "target": "node-supervisor" },
+    { "source": "node-supervisor", "target": "node-scheduler" },
+    { "source": "node-supervisor", "target": "node-comm" },
+    { "source": "node-supervisor", "target": "node-visual" },
+    { "source": "node-supervisor", "target": "node-search" },
+    { "source": "node-scheduler", "target": "node-embed" },
+    { "source": "node-comm", "target": "node-embed" },
+    { "source": "node-visual", "target": "node-embed" },
+    { "source": "node-search", "target": "node-embed" },
+    { "source": "node-embed", "target": "node-vector" },
+    { "source": "node-embed", "target": "node-output" }
+  ],
+  "metadata": {
+    "name": "JacobExecAI_20250523_232421_dfa733",
+    "description": "Voice-Driven Autonomous Assistant for Scheduling, Email, Search, and Image Generation"
+  },
+  "layout": {
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "zoom": 1
+    }
+  }
+}

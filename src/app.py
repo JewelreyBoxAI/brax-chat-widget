@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from typing import Optional
 from dotenv import load_dotenv
 
 # LangChain imports
@@ -45,17 +46,17 @@ except FileNotFoundError:
 
 # ─── ENCODE AVATAR IMAGE ──────────────────────────────────────────────────────
 
-img_path = os.path.join(ROOT, "images", "trump_close.png")
+img_path = os.path.join(ROOT, "images", "brax_avatar.png")
 if os.path.exists(img_path):
     with open(img_path, "rb") as img:
         IMG_URI = "data:image/png;base64," + base64.b64encode(img.read()).decode()
 else:
     logger.warning(f"Image not found at {img_path}, using fallback.")
-    IMG_URI = "https://via.placeholder.com/60x60.png?text=Bot"
+    IMG_URI = "https://via.placeholder.com/60x60.png?text=Brax"
 
 # ─── FASTAPI SETUP ───────────────────────────────────────────────────────────
 
-app = FastAPI(title="The Gym Bot (Text Only)")
+app = FastAPI(title="Brax Fine Jewelers AI Assistant")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("ALLOWED_ORIGINS", "").split(","),
@@ -67,7 +68,7 @@ app.add_middleware(
 
 memory = InMemoryChatMessageHistory(return_messages=True)
 llm = ChatOpenAI(model="gpt-4o-mini", max_tokens=1024, temperature=0.9)
-prompt_text = " ".join(AGENT_ROLES["gym_trump"]) if isinstance(AGENT_ROLES["gym_trump"], list) else AGENT_ROLES["gym_trump"]
+prompt_text = " ".join(AGENT_ROLES["brax_jeweler"]) if isinstance(AGENT_ROLES["brax_jeweler"], list) else AGENT_ROLES["brax_jeweler"]
 prompt_template = ChatPromptTemplate.from_messages([
     SystemMessagePromptTemplate.from_template(prompt_text),
     MessagesPlaceholder(variable_name="history"),
@@ -80,6 +81,24 @@ chain = prompt_template | llm
 class ChatRequest(BaseModel):
     user_input: str
     history: list
+
+# ─── JEWELRY-SPECIFIC MODELS ──────────────────────────────────────────────────
+
+class JewelryRequest(BaseModel):
+    occasion: str  # engagement, anniversary, birthday, etc.
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    style_preference: Optional[str] = None  # classic, modern, vintage
+    metal_preference: Optional[str] = None  # gold, platinum, silver
+    stone_preference: Optional[str] = None  # diamond, sapphire, emerald
+
+class AppointmentRequest(BaseModel):
+    customer_name: str
+    email: str
+    phone: str
+    preferred_date: str
+    consultation_type: str  # custom_design, appraisal, selection
+    message: Optional[str] = None
 
 # ─── ROOT REDIRECT ───────────────────────────────────────────────────────────
 
@@ -130,6 +149,90 @@ async def clear_chat():
             content={"error": "Failed to clear chat history."}
         )
 
+# ─── JEWELRY-SPECIFIC ENDPOINTS ───────────────────────────────────────────────
+
+@app.post("/jewelry/recommend")
+async def recommend_jewelry(request: JewelryRequest):
+    """Recommend jewelry pieces based on occasion, budget, and style preferences"""
+    try:
+        # This would integrate with Brax inventory system
+        recommendations = {
+            "occasion": request.occasion,
+            "recommendations": [
+                {
+                    "id": "BR001",
+                    "name": "Classic Solitaire Engagement Ring",
+                    "price": "$2,500 - $15,000",
+                    "description": "Timeless elegance with certified diamonds",
+                    "image_url": "/images/solitaire-ring.jpg"
+                },
+                {
+                    "id": "BR002", 
+                    "name": "Vintage Art Deco Collection",
+                    "price": "$1,800 - $8,500",
+                    "description": "Inspired by 1920s glamour with intricate details",
+                    "image_url": "/images/art-deco-collection.jpg"
+                }
+            ]
+        }
+        return JSONResponse(recommendations)
+    except Exception as e:
+        logger.error(f"Error in jewelry recommendations: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to process jewelry recommendation request."}
+        )
+
+@app.post("/appointment/schedule")
+async def schedule_consultation(request: AppointmentRequest):
+    """Schedule an in-person jewelry consultation"""
+    try:
+        # This would integrate with Brax appointment system
+        appointment_data = {
+            "appointment_id": f"BRAX-{request.customer_name[:3].upper()}-001",
+            "customer": request.customer_name,
+            "email": request.email,
+            "phone": request.phone,
+            "date": request.preferred_date,
+            "type": request.consultation_type,
+            "status": "pending_confirmation",
+            "message": "Thank you for scheduling with Brax Fine Jewelers. We'll contact you within 24 hours to confirm your appointment."
+        }
+        return JSONResponse(appointment_data)
+    except Exception as e:
+        logger.error(f"Error scheduling appointment: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to schedule appointment. Please call (949) 250-9949."}
+        )
+
+@app.get("/inventory/search")
+async def search_inventory(query: str, budget_min: Optional[float] = None, budget_max: Optional[float] = None):
+    """Search Brax inventory based on criteria"""
+    try:
+        # This would integrate with Brax inventory database
+        search_results = {
+            "query": query,
+            "budget_range": f"${budget_min or 0} - ${budget_max or 'No limit'}",
+            "results": [
+                {
+                    "id": "BR101",
+                    "name": f"Diamond {query.title()} Collection",
+                    "price_range": "$1,200 - $12,000",
+                    "available": True,
+                    "description": f"Exquisite {query} pieces featuring certified diamonds and precious metals"
+                }
+            ],
+            "total_count": 1
+        }
+        return JSONResponse(search_results)
+    except Exception as e:
+        logger.error(f"Error searching inventory: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to search inventory at this time."}
+        )
+
 # ─── WIDGET ENDPOINT ─────────────────────────────────────────────────────────
 
 @app.get("/widget", response_class=HTMLResponse)
@@ -147,7 +250,7 @@ async def widget(request: Request):
 # ─── CLI SANITY TEST ───────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("Gym Bot CLI Test (type 'exit')")
+    print("Brax Fine Jewelers AI Assistant CLI Test (type 'exit')")
     history = []
     while True:
         try:
@@ -155,7 +258,7 @@ if __name__ == "__main__":
             if text.lower() in ("exit", "quit"): sys.exit(0)
             res = chain.invoke({"user_input": text, "history": history})
             reply = res.content.strip()
-            print("Bot:", reply)
+            print("Elena:", reply)
             memory.add_user_message(text)
             memory.add_ai_message(reply)
             history = memory.messages

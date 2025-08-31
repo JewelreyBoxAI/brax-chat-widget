@@ -3,173 +3,334 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Gym Bot Chat Widget</title>
+  <title>Brax Fine Jewelers - Jewelry Consultant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
-    #gym-chat-widget {
+    /* Brax Fine Jewelers Luxury Styling */
+    :root {
+      --brax-gold: #D4AF37;
+      --brax-champagne: #F7E7CE;
+      --brax-dark-gold: #B8860B;
+      --brax-charcoal: #2C2C2C;
+      --brax-warm-gray: #F5F5F0;
+      --brax-light-gray: #E8E8E8;
+      --brax-white: #FFFFFF;
+      --brax-burgundy: #800020;
+      --brax-cream: #FFF8DC;
+      --brax-pearl: #F8F6F0;
+    }
+
+    #brax-chat-widget {
       position: fixed;
       bottom: 32px;
-      left: 50%;
-      transform: translateX(-50%);
+      right: 32px;
       z-index: 9999;
-      font-family: "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      font-family: "Lato", "Helvetica Neue", sans-serif;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      align-items: flex-end;
     }
 
-    #gym-chat-button {
-      width: 84px;
-      height: 84px;
+    #brax-chat-button {
+      width: 72px;
+      height: 72px;
       border-radius: 50%;
-      background: url("{{ img_uri }}") no-repeat center/cover;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      background: linear-gradient(135deg, var(--brax-gold) 0%, var(--brax-champagne) 100%);
+      background-image: url("{{ img_uri }}");
+      background-size: cover;
+      background-position: center;
+      border: 3px solid var(--brax-white);
+      box-shadow: 
+        0 8px 25px rgba(212, 175, 55, 0.3),
+        0 4px 12px rgba(0, 0, 0, 0.15);
       cursor: pointer;
-      transition: opacity 0.3s ease, visibility 0.3s ease;
+      transition: all 0.3s ease;
+      animation: elegantPulse 3s ease-in-out infinite;
     }
 
-    #gym-chat-button.hidden {
+    @keyframes elegantPulse {
+      0%, 100% { 
+        transform: scale(1); 
+        box-shadow: 
+          0 8px 25px rgba(212, 175, 55, 0.3),
+          0 4px 12px rgba(0, 0, 0, 0.15),
+          0 0 0 0 rgba(212, 175, 55, 0.4);
+      }
+      50% { 
+        transform: scale(1.05); 
+        box-shadow: 
+          0 12px 35px rgba(212, 175, 55, 0.4),
+          0 6px 16px rgba(0, 0, 0, 0.2),
+          0 0 0 8px rgba(212, 175, 55, 0.1);
+      }
+    }
+
+    #brax-chat-button:hover {
+      transform: scale(1.1);
+      box-shadow: 
+        0 12px 35px rgba(212, 175, 55, 0.4),
+        0 6px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    #brax-chat-button.hidden {
       opacity: 0;
       visibility: hidden;
+      transform: scale(0.8);
     }
 
-    #gym-chat-panel {
+    #brax-chat-panel {
       display: none;
       flex-direction: column;
-      width: 360px;
+      width: 380px;
       max-width: 95vw;
-      height: 520px;
-      background: #000;
-      border-radius: 10px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      height: 580px;
+      background: linear-gradient(145deg, var(--brax-pearl) 0%, var(--brax-cream) 100%);
+      border-radius: 16px;
+      border: 2px solid var(--brax-gold);
+      box-shadow: 
+        0 20px 40px rgba(212, 175, 55, 0.1),
+        0 8px 16px rgba(0, 0, 0, 0.1);
       overflow: hidden;
+      margin-bottom: 16px;
     }
 
-    #gym-chat-header {
+    #brax-chat-header {
       display: flex;
       align-items: center;
-      padding: 12px;
-      background: #fbed03;
-      color: #000;
-      font-weight: bold;
-      font-size: 16px;
+      padding: 20px;
+      background: linear-gradient(135deg, var(--brax-gold) 0%, var(--brax-champagne) 100%);
+      border-bottom: 1px solid var(--brax-dark-gold);
+      color: var(--brax-charcoal);
     }
 
-    #gym-chat-header img {
-      width: 48px;
-      height: 48px;
+    #brax-chat-header img {
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
-      margin-right: 10px;
+      margin-right: 16px;
       flex-shrink: 0;
+      border: 2px solid var(--brax-white);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
 
-    #gym-chat-messages-container {
+    .header-content {
       flex: 1;
-      padding: 10px;
+    }
+
+    .consultant-name {
+      font-family: "Playfair Display", serif;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .consultant-title {
+      font-size: 13px;
+      font-weight: 400;
+      opacity: 0.8;
+      margin-bottom: 4px;
+    }
+
+    .brand-tagline {
+      font-size: 11px;
+      font-weight: 300;
+      opacity: 0.7;
+      font-style: italic;
+    }
+
+    #brax-chat-messages-container {
+      flex: 1;
+      padding: 20px;
       overflow-y: auto;
-      background: #111;
-      color: #fff;
+      background: var(--brax-pearl);
+      color: var(--brax-charcoal);
+    }
+
+    #brax-chat-messages-container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #brax-chat-messages-container::-webkit-scrollbar-track {
+      background: var(--brax-light-gray);
+      border-radius: 3px;
+    }
+
+    #brax-chat-messages-container::-webkit-scrollbar-thumb {
+      background: var(--brax-gold);
+      border-radius: 3px;
     }
 
     .msg {
-      margin: 10px 0;
-      max-width: 80%;
-      padding: 10px 14px;
-      border-radius: 20px;
+      margin: 16px 0;
+      max-width: 85%;
+      padding: 14px 18px;
+      border-radius: 18px;
       font-size: 15px;
-      line-height: 1.4;
+      line-height: 1.5;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
-    .msg.bot {
-      background: #fbed03;
-      color: #000;
+    .msg.consultant {
+      background: linear-gradient(135deg, var(--brax-cream) 0%, var(--brax-pearl) 100%);
+      border-left: 3px solid var(--brax-gold);
+      color: var(--brax-charcoal);
       align-self: flex-start;
+      border-radius: 18px 18px 18px 4px;
     }
 
     .msg.user {
-      background: #333;
-      color: #fff;
+      background: linear-gradient(135deg, var(--brax-champagne) 0%, var(--brax-gold) 100%);
+      color: var(--brax-charcoal);
       align-self: flex-end;
       text-align: right;
+      border-radius: 18px 18px 4px 18px;
+      margin-left: auto;
     }
 
     #typing-indicator {
       font-style: italic;
-      font-size: 12px;
-      color: #aaa;
-      padding: 0 14px 6px;
+      font-size: 13px;
+      color: var(--brax-dark-gold);
+      padding: 0 18px 8px;
       display: none;
     }
 
-    #gym-chat-input {
+    #brax-chat-input {
       display: flex;
       flex-direction: column;
-      border-top: 1px solid #222;
-      background: #000;
+      border-top: 1px solid var(--brax-light-gray);
+      background: var(--brax-white);
+      padding: 20px;
+    }
+
+    #brax-chat-input input {
+      border: 2px solid var(--brax-light-gray);
       padding: 16px;
-    }
-
-    #gym-chat-input input {
-      border: none;
-      padding: 14px;
       font-size: 15px;
-      border-radius: 6px;
-      margin-bottom: 8px;
-      background: #fff;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      background: var(--brax-white);
+      color: var(--brax-charcoal);
+      font-family: "Lato", sans-serif;
+      transition: border-color 0.3s ease;
     }
 
-    #gym-chat-send {
+    #brax-chat-input input:focus {
+      outline: none;
+      border-color: var(--brax-gold);
+      box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+    }
+
+    #brax-chat-input input::placeholder {
+      color: #999;
+      font-style: italic;
+    }
+
+    #brax-chat-send {
       border: none;
-      background: #fbed03;
-      color: #000;
-      padding: 12px;
-      font-weight: bold;
+      background: linear-gradient(135deg, var(--brax-gold) 0%, var(--brax-dark-gold) 100%);
+      color: var(--brax-white);
+      padding: 14px 24px;
+      font-weight: 500;
       font-size: 15px;
       cursor: pointer;
-      border-radius: 4px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+      transition: all 0.3s ease;
+      font-family: "Lato", sans-serif;
     }
 
-    #gym-chat-clear {
+    #brax-chat-send:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4);
+    }
+
+    #brax-chat-clear {
       background: transparent;
-      color: #fff;
-      border: 1px solid #fff;
-      padding: 6px;
+      color: var(--brax-charcoal);
+      border: 1px solid var(--brax-light-gray);
+      padding: 8px 16px;
       font-size: 13px;
       margin-top: 8px;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: "Lato", sans-serif;
+    }
+
+    #brax-chat-clear:hover {
+      border-color: var(--brax-gold);
+      color: var(--brax-gold);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 480px) {
+      #brax-chat-widget {
+        bottom: 20px;
+        right: 20px;
+      }
+      
+      #brax-chat-panel {
+        width: calc(100vw - 40px);
+        height: calc(100vh - 100px);
+        border-radius: 12px;
+      }
+      
+      #brax-chat-button {
+        width: 60px;
+        height: 60px;
+      }
     }
   </style>
 </head>
 <body>
-  <div id="gym-chat-widget">
-    <div id="gym-chat-panel">
-      <div id="gym-chat-header">
-        <img src="{{ img_uri }}" alt="Bot Avatar">
-        The Gym Bot
+  <div id="brax-chat-widget">
+    <div id="brax-chat-panel">
+      <div id="brax-chat-header">
+        <img src="{{ img_uri }}" alt="Elena Marchetti - Jewelry Consultant">
+        <div class="header-content">
+          <div class="consultant-name">Elena Marchetti</div>
+          <div class="consultant-title">Master Jewelry Consultant</div>
+          <div class="brand-tagline">Brax Fine Jewelers • Since 2005</div>
+        </div>
       </div>
-      <div id="gym-chat-messages-container" aria-live="polite"></div>
-      <div id="typing-indicator">Trump is typing...</div>
-      <div id="gym-chat-input">
-        <input type="text" id="gym-chat-text" placeholder="Type your message…">
-        <button id="gym-chat-send">Send</button>
-        <button id="gym-chat-clear">Clear</button>
+      <div id="brax-chat-messages-container" aria-live="polite"></div>
+      <div id="typing-indicator">Elena is typing...</div>
+      <div id="brax-chat-input">
+        <input type="text" id="brax-chat-text" placeholder="Ask about diamonds, custom designs, or schedule a consultation...">
+        <button id="brax-chat-send">Send Message</button>
+        <button id="brax-chat-clear">Clear Chat</button>
       </div>
     </div>
-    <div id="gym-chat-button" aria-label="Open chat"></div>
+    <div id="brax-chat-button" aria-label="Chat with Jewelry Consultant"></div>
   </div>
 
   <script>
     (function () {
       const CHAT_URL = "{{ chat_url }}";
-      const panel = document.getElementById("gym-chat-panel");
-      const button = document.getElementById("gym-chat-button");
-      const messages = document.getElementById("gym-chat-messages-container");
-      const input = document.getElementById("gym-chat-text");
-      const send = document.getElementById("gym-chat-send");
-      const clear = document.getElementById("gym-chat-clear");
+      const panel = document.getElementById("brax-chat-panel");
+      const button = document.getElementById("brax-chat-button");
+      const messages = document.getElementById("brax-chat-messages-container");
+      const input = document.getElementById("brax-chat-text");
+      const send = document.getElementById("brax-chat-send");
+      const clear = document.getElementById("brax-chat-clear");
       const typing = document.getElementById("typing-indicator");
-      let history = JSON.parse(localStorage.getItem("gym_bot_history")) || [];
+      let history = JSON.parse(localStorage.getItem("brax_jewelry_history")) || [];
+
+      // Welcome message for new visitors
+      const welcomeMessages = [
+        "Welcome to Brax Fine Jewelers! I'm Elena, your personal jewelry consultant.",
+        "Whether you're celebrating an engagement, anniversary, or treating yourself, I'm here to help you find the perfect piece.",
+        "What brings you to Brax today?"
+      ];
+
+      // Initialize with welcome message if no history
+      if (history.length === 0) {
+        welcomeMessages.forEach(msg => {
+          history.push({ role: "assistant", content: msg });
+        });
+        localStorage.setItem("brax_jewelry_history", JSON.stringify(history));
+      }
 
       function togglePanel() {
         const isVisible = panel.style.display === "flex";
@@ -189,7 +350,9 @@
 
       function renderMsg(text, cls) {
         const div = document.createElement("div");
-        div.className = "msg " + cls;
+        // Update class names for Brax branding
+        const className = cls === "bot" ? "consultant" : cls;
+        div.className = "msg " + className;
         div.innerHTML = escapeHTML(text);
         messages.appendChild(div);
         messages.scrollTop = messages.scrollHeight;
@@ -214,11 +377,11 @@
             body: JSON.stringify({ user_input: txt, history })
           });
           const data = await res.json();
-          renderMsg(data.reply, "bot");
+          renderMsg(data.reply, "consultant");
           history = data.history;
-          localStorage.setItem("gym_bot_history", JSON.stringify(history));
+          localStorage.setItem("brax_jewelry_history", JSON.stringify(history));
         } catch (e) {
-          renderMsg("⚠️ Error contacting bot.", "bot");
+          renderMsg("⚠️ Unable to connect. Please try again or call (949) 250-9949.", "consultant");
         } finally {
           showTyping(false);
         }
@@ -226,8 +389,14 @@
 
       function clearChat() {
         history = [];
-        localStorage.removeItem("gym_bot_history");
+        localStorage.removeItem("brax_jewelry_history");
         messages.innerHTML = "";
+        // Re-add welcome messages after clearing
+        welcomeMessages.forEach(msg => {
+          history.push({ role: "assistant", content: msg });
+        });
+        localStorage.setItem("brax_jewelry_history", JSON.stringify(history));
+        history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "consultant"));
       }
 
       button.onclick = togglePanel;
@@ -236,7 +405,7 @@
       input.addEventListener("keypress", (e) => {
         if (e.key === "Enter") postMessage();
       });
-      history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "bot"));
+      history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "consultant"));
     })();
   </script>
 </body>
