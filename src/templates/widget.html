@@ -316,6 +316,7 @@
       const clear = document.getElementById("brax-chat-clear");
       const typing = document.getElementById("typing-indicator");
       let history = JSON.parse(localStorage.getItem("brax_jewelry_history")) || [];
+      let sessionId = localStorage.getItem("brax_session_id") || null;
 
       // Welcome message for new visitors
       const welcomeMessages = [
@@ -374,12 +375,18 @@
           const res = await fetch(CHAT_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_input: txt, history })
+            body: JSON.stringify({ 
+              user_input: txt, 
+              history: history,
+              session_id: sessionId 
+            })
           });
           const data = await res.json();
           renderMsg(data.reply, "consultant");
           history = data.history;
+          sessionId = data.session_id;
           localStorage.setItem("brax_jewelry_history", JSON.stringify(history));
+          localStorage.setItem("brax_session_id", sessionId);
         } catch (e) {
           renderMsg("⚠️ Unable to connect. Please try again or call (949) 250-9949.", "consultant");
         } finally {
@@ -387,10 +394,25 @@
         }
       }
 
-      function clearChat() {
+      async function clearChat() {
+        try {
+          // Clear session on server
+          await fetch("/clear_chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId })
+          });
+        } catch (e) {
+          console.warn("Failed to clear server session:", e);
+        }
+        
+        // Clear local storage
         history = [];
         localStorage.removeItem("brax_jewelry_history");
+        localStorage.removeItem("brax_session_id");
+        sessionId = null;
         messages.innerHTML = "";
+        
         // Re-add welcome messages after clearing
         welcomeMessages.forEach(msg => {
           history.push({ role: "assistant", content: msg });

@@ -3,13 +3,19 @@ import logging
 import os
 import sys
 import base64
-from fastapi import FastAPI, Request
+import uuid
+import re
+from datetime import datetime
+from typing import Dict, Optional
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, validator, Field
 from dotenv import load_dotenv
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # LangChain imports
 from langchain_core.chat_history import InMemoryChatMessageHistory
@@ -25,7 +31,7 @@ from langchain.prompts import (
 # ─── ENV + LOGGING ───────────────────────────────────────────────────────────
 
 load_dotenv()
-logger = logging.getLogger("gym_bot")
+logger = logging.getLogger("brax_jeweler")
 logger.setLevel(logging.INFO)
 
 # ─── PATHS & TEMPLATES ────────────────────────────────────────────────────────
@@ -57,17 +63,43 @@ else:
 # ─── FASTAPI SETUP ───────────────────────────────────────────────────────────
 
 app = FastAPI(title="Brax Fine Jewelers AI Assistant")
+
+# Rate limiting setup
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS setup with secure defaults
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
+allowed_origins = [origin.strip() for origin in allowed_origins if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "").split(","),
+    allow_origins=allowed_origins,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
-# ─── LLM + MEMORY ─────────────────────────────────────────────────────────────
+# ─── LLM + SESSION MEMORY ───────────────────────────────────────────────────
 
-memory = InMemoryChatMessageHistory(return_messages=True)
-llm = ChatOpenAI(model="gpt-4o-mini", max_tokens=1024, temperature=0.9)
+# Session-based memory storage (fixes global memory sharing)
+user_sessions: Dict[str, InMemoryChatMessageHistory] = {}
+
+def get_or_create_session(session_id: Optional[str] = None) -> tuple[str, InMemoryChatMessageHistory]:
+    """Get or create a user session with isolated memory"""
+    if not session_id:
+        session_id = str(uuid.uuid4())
+    if session_id not in user_sessions:
+        user_sessions[session_id] = InMemoryChatMessageHistory(return_messages=True)
+    return session_id, user_sessions[session_id]
+
+# LLM configuration with environment variables
+model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+max_tokens = int(os.getenv("MAX_TOKENS", "1024"))
+temperature = float(os.getenv("TEMPERATURE", "0.9"))
+
+llm = ChatOpenAI(model=model_name, max_tokens=max_tokens, temperature=temperature)
 prompt_text = " ".join(AGENT_ROLES["brax_jeweler"]) if isinstance(AGENT_ROLES["brax_jeweler"], list) else AGENT_ROLES["brax_jeweler"]
 prompt_template = ChatPromptTemplate.from_messages([
     SystemMessagePromptTemplate.from_template(prompt_text),
@@ -79,8 +111,27 @@ chain = prompt_template | llm
 # ─── REQUEST MODEL ────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    user_input: str
-    history: list
+    user_input: str = Field(..., max_length=1000, min_length=1)
+    history: list = Field(default=[], max_items=50)
+    session_id: Optional[str] = None
+    
+    @validator('user_input')
+    def sanitize_input(cls, v):
+        """Sanitize and validate user input"""
+        v = v.strip()
+        if not v:
+            raise ValueError('Input cannot be empty')
+        
+        # Remove potential script tags and other dangerous content
+        v = re.sub(r'<script.*?</script>', '', v, flags=re.DOTALL | re.IGNORECASE)
+        v = re.sub(r'<.*?>', '', v)  # Remove HTML tags
+        v = re.sub(r'javascript:', '', v, flags=re.IGNORECASE)
+        
+        # Limit length after sanitization
+        if len(v) > 1000:
+            v = v[:1000]
+            
+        return v
 
 # ─── JEWELRY-SPECIFIC MODELS ──────────────────────────────────────────────────
 
@@ -100,6 +151,19 @@ class AppointmentRequest(BaseModel):
     consultation_type: str  # custom_design, appraisal, selection
     message: Optional[str] = None
 
+# ─── HEALTH CHECK ────────────────────────────────────────────────────────────
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    return {
+        "status": "healthy",
+        "service": "Brax Fine Jewelers AI Assistant",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "active_sessions": len(user_sessions)
+    }
+
 # ─── ROOT REDIRECT ───────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -113,17 +177,39 @@ def serialize_messages(messages: list[BaseMessage]):
     return [{"role": msg.type, "content": msg.content} for msg in messages]
 
 @app.post("/chat")
-async def chat(req: ChatRequest):
+@limiter.limit("20/minute")  # 20 requests per minute per IP
+async def chat(request: Request, req: ChatRequest):
     try:
-        history = req.history or []
+        # Get or create session-based memory
+        session_id, session_memory = get_or_create_session(req.session_id)
+        
+        # Use session history if available, otherwise use request history
+        history = serialize_messages(session_memory.messages) if session_memory.messages else (req.history or [])
+        
+        # Invoke the LLM chain
         res = chain.invoke({"user_input": req.user_input, "history": history})
         reply = res.content.strip()
-        memory.add_user_message(req.user_input)
-        memory.add_ai_message(reply)
+        
+        # Add to session memory
+        session_memory.add_user_message(req.user_input)
+        session_memory.add_ai_message(reply)
+        
+        logger.info(f"Chat request processed for session: {session_id[:8]}...", extra={
+            "session_id": session_id,
+            "user_input_length": len(req.user_input)
+        })
+        
         return JSONResponse({
             "reply": reply,
-            "history": serialize_messages(memory.messages)
+            "session_id": session_id,
+            "history": serialize_messages(session_memory.messages)
         })
+    except ValueError as ve:
+        logger.warning(f"Validation error in /chat: {ve}")
+        return JSONResponse(
+            status_code=400,
+            content={"error": str(ve)}
+        )
     except Exception as e:
         logger.error(f"Error in /chat: {e}", exc_info=True)
         return JSONResponse(
@@ -133,15 +219,32 @@ async def chat(req: ChatRequest):
 
 # ─── CLEAR CHAT ENDPOINT ──────────────────────────────────────────────────────
 
+class ClearChatRequest(BaseModel):
+    session_id: Optional[str] = None
+
 @app.post("/clear_chat")
-async def clear_chat():
+@limiter.limit("5/minute")  # 5 clear requests per minute per IP
+async def clear_chat(request: Request, req: ClearChatRequest = None):
     """
-    Clear in-memory chat history for all users (global reset).
-    Note: This affects all sessions since memory is global.
+    Clear chat history for a specific session or all sessions.
     """
     try:
-        memory.clear()
-        return JSONResponse({"status": "ok", "message": "Chat history cleared."})
+        if req and req.session_id:
+            # Clear specific session
+            if req.session_id in user_sessions:
+                user_sessions[req.session_id].clear()
+                logger.info(f"Cleared session: {req.session_id[:8]}...")
+                return JSONResponse({"status": "ok", "message": "Session chat history cleared."})
+            else:
+                return JSONResponse(
+                    status_code=404,
+                    content={"error": "Session not found."}
+                )
+        else:
+            # Clear all sessions (admin function)
+            user_sessions.clear()
+            logger.info("Cleared all user sessions")
+            return JSONResponse({"status": "ok", "message": "All chat history cleared."})
     except Exception as e:
         logger.error(f"Error clearing chat history: {e}", exc_info=True)
         return JSONResponse(
