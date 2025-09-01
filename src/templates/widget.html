@@ -328,6 +328,12 @@
   <script>
     (function () {
       const CHAT_URL = "{{ chat_url }}";
+      
+      // Debug: Validate template variables
+      console.log('Widget initialized with CHAT_URL:', CHAT_URL);
+      if (!CHAT_URL || CHAT_URL.includes('{{')) {
+        console.error('Template variable chat_url not properly rendered!');
+      }
       const panel = document.getElementById("brax-chat-panel");
       const button = document.getElementById("brax-chat-button");
       const messages = document.getElementById("brax-chat-messages-container");
@@ -335,8 +341,21 @@
       const send = document.getElementById("brax-chat-send");
       const clear = document.getElementById("brax-chat-clear");
       const typing = document.getElementById("typing-indicator");
-      let history = JSON.parse(localStorage.getItem("brax_jewelry_history")) || [];
+      
+      // Safe JSON parsing with error handling
+      let history = [];
       let sessionId = localStorage.getItem("brax_session_id") || null;
+      
+      try {
+        const historyData = localStorage.getItem("brax_jewelry_history");
+        if (historyData && historyData !== "undefined" && historyData !== "null") {
+          history = JSON.parse(historyData);
+        }
+      } catch (e) {
+        console.warn("Failed to parse chat history from localStorage:", e);
+        history = [];
+        localStorage.removeItem("brax_jewelry_history"); // Clear corrupted data
+      }
 
       // Welcome message for new visitors
       const welcomeMessages = [
