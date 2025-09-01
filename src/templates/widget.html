@@ -328,12 +328,6 @@
   <script>
     (function () {
       const CHAT_URL = "{{ chat_url }}";
-      
-      // Debug: Validate template variables
-      console.log('Widget initialized with CHAT_URL:', CHAT_URL);
-      if (!CHAT_URL || CHAT_URL.includes('{{')) {
-        console.error('Template variable chat_url not properly rendered!');
-      }
       const panel = document.getElementById("brax-chat-panel");
       const button = document.getElementById("brax-chat-button");
       const messages = document.getElementById("brax-chat-messages-container");
