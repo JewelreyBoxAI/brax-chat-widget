@@ -355,12 +355,20 @@
 
       function togglePanel() {
         console.log('Toggle panel clicked'); // Debug log
-        const isVisible = panel.style.display === "flex";
+        // Use getComputedStyle to check actual display value (CSS + inline)
+        const computedStyle = window.getComputedStyle(panel);
+        const isVisible = computedStyle.display === "flex" || panel.style.display === "flex";
+        
+        console.log('Panel currently visible:', isVisible); // Debug log
         panel.style.display = isVisible ? "none" : "flex";
         button.classList.toggle("hidden", !isVisible);
+        
         if (!isVisible) {
           input.focus();
           messages.scrollTop = messages.scrollHeight;
+          console.log('Panel opened, focusing input'); // Debug log
+        } else {
+          console.log('Panel closed'); // Debug log
         }
       }
 
@@ -442,6 +450,10 @@
         history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "consultant"));
       }
 
+      // Initialize welcome messages display
+      console.log('Initializing widget, history length:', history.length);
+      history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "consultant"));
+
       // Multiple event binding approaches for reliability
       button.onclick = togglePanel;
       button.addEventListener('click', togglePanel, true);
@@ -455,7 +467,8 @@
       input.addEventListener("keypress", (e) => {
         if (e.key === "Enter") postMessage();
       });
-      history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "consultant"));
+      
+      console.log('Widget initialized successfully');
     })();
   </script>
 </body>
