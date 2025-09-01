@@ -52,8 +52,13 @@ except FileNotFoundError:
 
 # ─── ENCODE AVATAR IMAGE ──────────────────────────────────────────────────────
 
-
-
+img_path = os.path.join(ROOT, "images", "brax_avatar.png")
+if os.path.exists(img_path):
+    with open(img_path, "rb") as img:
+        IMG_URI = "data:image/png;base64," + base64.b64encode(img.read()).decode()
+else:
+    logger.warning(f"Image not found at {img_path}, using fallback.")
+    IMG_URI = "https://via.placeholder.com/60x60.png?text=Brax"
 
 # ─── FASTAPI SETUP ───────────────────────────────────────────────────────────
 
