@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, field_validator, Field
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -115,7 +115,8 @@ class ChatRequest(BaseModel):
     history: list = Field(default=[], max_items=50)
     session_id: Optional[str] = None
     
-    @validator('user_input')
+    @field_validator('user_input')
+    @classmethod
     def sanitize_input(cls, v):
         """Sanitize and validate user input"""
         v = v.strip()
@@ -368,6 +369,8 @@ async def widget(request: Request):
 
 if __name__ == "__main__":
     print("Brax Fine Jewelers AI Assistant CLI Test (type 'exit')")
+    # Create a test session for CLI testing
+    test_session_id, test_memory = get_or_create_session()
     history = []
     while True:
         try:
@@ -376,9 +379,9 @@ if __name__ == "__main__":
             res = chain.invoke({"user_input": text, "history": history})
             reply = res.content.strip()
             print("Elena:", reply)
-            memory.add_user_message(text)
-            memory.add_ai_message(reply)
-            history = memory.messages
+            test_memory.add_user_message(text)
+            test_memory.add_ai_message(reply)
+            history = [{"role": msg.type, "content": msg.content} for msg in test_memory.messages]
         except KeyboardInterrupt:
             sys.exit(0)
         except Exception as e:
