@@ -8,10 +8,11 @@ import re
 from datetime import datetime
 from typing import Dict, Optional
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, field_validator, Field
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -28,8 +29,33 @@ from langchain_openai import ChatOpenAI
 # ─── ENV + LOGGING ───────────────────────────────────────────────────────────
 
 load_dotenv()
+
+# Configure structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger("brax_jeweler")
-logger.setLevel(logging.INFO)
+
+# Validate critical environment variables at startup
+REQUIRED_ENV_VARS = {
+    'OPENAI_API_KEY': 'OpenAI API key is required for LLM functionality'
+}
+
+missing_vars = []
+for var, description in REQUIRED_ENV_VARS.items():
+    if not os.getenv(var):
+        missing_vars.append(f"{var}: {description}")
+
+if missing_vars:
+    error_msg = "Missing required environment variables:\n" + "\n".join(f"  - {var}" for var in missing_vars)
+    logger.critical(error_msg)
+    sys.exit(1)
+
+logger.info("Environment validation successful")
 
 # ─── PATHS & TEMPLATES ────────────────────────────────────────────────────────
 
@@ -59,7 +85,17 @@ else:
 
 # ─── FASTAPI SETUP ───────────────────────────────────────────────────────────
 
-app = FastAPI(title="Brax Fine Jewelers AI Assistant")
+app = FastAPI(
+    title="Brax Fine Jewelers AI Assistant",
+    version="2.0.0",
+    description="Multi-tenant jewelry consultation chatbot with canonical LangChain implementation",
+    docs_url="/admin/docs" if os.getenv("ENVIRONMENT") == "development" else None,
+    redoc_url="/admin/redoc" if os.getenv("ENVIRONMENT") == "development" else None
+)
+
+# Security middleware
+trusted_hosts = os.getenv("TRUSTED_HOSTS", "*.azurewebsites.net,localhost,127.0.0.1").split(",")
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=[host.strip() for host in trusted_hosts])
 
 # Rate limiting setup
 limiter = Limiter(key_func=get_remote_address)
@@ -67,7 +103,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS setup with secure defaults
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "https://*.braxjewelers.com,https://*.azurewebsites.net").split(",")
 allowed_origins = [origin.strip() for origin in allowed_origins if origin.strip()]
 
 app.add_middleware(
@@ -75,8 +111,25 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    expose_headers=["X-Session-ID"]
 )
+
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True, extra={
+        "url": str(request.url),
+        "method": request.method,
+        "client": request.client.host if request.client else "unknown"
+    })
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "An internal server error occurred",
+            "request_id": str(uuid.uuid4())[:8]
+        }
+    )
 
 # ─── LLM + CANONICAL MESSAGE HISTORY ─────────────────────────────────────────
 
@@ -170,14 +223,44 @@ class AppointmentRequest(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for monitoring"""
-    return {
-        "status": "healthy",
-        "service": "Brax Fine Jewelers AI Assistant",
-        "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat(),
-        "active_sessions": len(_session_store),
-    }
+    """Comprehensive health check endpoint for monitoring"""
+    try:
+        # Test LLM configuration
+        llm_healthy = bool(os.getenv('OPENAI_API_KEY'))
+        
+        # Test template loading
+        template_healthy = os.path.exists(TEMPLATE_DIR) and os.path.exists(os.path.join(TEMPLATE_DIR, "widget.html"))
+        
+        # Memory usage check
+        session_count = len(_session_store)
+        
+        overall_status = "healthy" if all([llm_healthy, template_healthy]) else "degraded"
+        
+        return {
+            "status": overall_status,
+            "service": "Brax Fine Jewelers AI Assistant",
+            "version": "2.0.0",
+            "timestamp": datetime.utcnow().isoformat(),
+            "checks": {
+                "llm_configured": llm_healthy,
+                "templates_loaded": template_healthy,
+                "active_sessions": session_count
+            },
+            "environment": {
+                "python_version": sys.version.split()[0],
+                "app_mode": os.getenv("ENVIRONMENT", "production")
+            }
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
 
 # ─── ROOT REDIRECT ───────────────────────────────────────────────────────────
 
@@ -210,13 +293,15 @@ async def chat(request: Request, req: ChatRequest):
             extra={"session_id": session_id, "user_input_length": len(req.user_input)},
         )
 
-        return JSONResponse(
+        response = JSONResponse(
             {
                 "reply": reply,
                 "session_id": session_id,
                 "history": serialize_messages(history_msgs),
             }
         )
+        response.headers["X-Session-ID"] = session_id
+        return response
     except ValueError as ve:
         logger.warning(f"Validation error in /chat: {ve}")
         return JSONResponse(status_code=400, content={"error": str(ve)})

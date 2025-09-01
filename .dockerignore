@@ -1,0 +1,26 @@
+# Ignore files that shouldn't be in Docker image
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache
+.coverage
+.tox
+.cache
+.mypy_cache
+*.egg-info
+build
+dist
+.env
+*.log
+*.zip
+deploy.cmd
+.deployment
+gunicorn.conf.py
+application.py
+.azure
+.claude
+AZURE_CLI_AUTH_TROUBLESHOOTING.md
