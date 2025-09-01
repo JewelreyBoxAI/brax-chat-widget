@@ -454,15 +454,12 @@
       console.log('Initializing widget, history length:', history.length);
       history.forEach((msg) => renderMsg(msg.content, msg.role === "user" ? "user" : "consultant"));
 
-      // Multiple event binding approaches for reliability
-      button.onclick = togglePanel;
-      button.addEventListener('click', togglePanel, true);
+      // Clean event binding for avatar button
+      button.addEventListener('click', togglePanel);
       button.addEventListener('touchstart', togglePanel, { passive: true });
       
-      send.onclick = postMessage;
+      // Other button event bindings
       send.addEventListener('click', postMessage);
-      
-      clear.onclick = clearChat;
       clear.addEventListener('click', clearChat);
       input.addEventListener("keypress", (e) => {
         if (e.key === "Enter") postMessage();
