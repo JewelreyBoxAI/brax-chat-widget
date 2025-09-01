@@ -9,3 +9,4 @@ langchain-openai
 langchain-core
 langchain-community
 slowapi
+pydantic
