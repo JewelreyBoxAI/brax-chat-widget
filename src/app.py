@@ -26,6 +26,15 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_openai import ChatOpenAI
 
+# GHL MCP Client
+from .ghl_mcp_client import create_ghl_client, GHLMCPClient, ContactModel, OpportunityModel, MessageModel
+
+# Tavily Search Client
+from .tavily_client import create_tavily_client, TavilySearchClient, SearchResponse, format_search_results
+
+# LangChain Tools
+from .langchain_tools import create_langchain_tools
+
 # ─── ENV + LOGGING ───────────────────────────────────────────────────────────
 
 load_dotenv()
@@ -56,6 +65,26 @@ if missing_vars:
     sys.exit(1)
 
 logger.info("Environment validation successful")
+
+# ─── GHL MCP CLIENT INITIALIZATION ───────────────────────────────────────────
+
+# Initialize GHL MCP client if enabled
+ghl_client: Optional[GHLMCPClient] = None
+if os.getenv("GHL_MCP_ENABLED", "false").lower() == "true":
+    ghl_client = create_ghl_client()
+    if ghl_client:
+        logger.info("GHL MCP client initialized successfully")
+    else:
+        logger.warning("GHL MCP client initialization failed")
+else:
+    logger.info("GHL MCP integration disabled")
+
+# Initialize Tavily Search client
+tavily_client: Optional[TavilySearchClient] = create_tavily_client()
+if tavily_client:
+    logger.info("Tavily Search client initialized successfully")
+else:
+    logger.info("Tavily Search client not available - web search features disabled")
 
 # ─── PATHS & TEMPLATES ────────────────────────────────────────────────────────
 
@@ -136,17 +165,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 # session_id -> InMemoryChatMessageHistory
 _session_store: Dict[str, InMemoryChatMessageHistory] = {}
 
-def _history_factory(config: Dict) -> InMemoryChatMessageHistory:
+def _history_factory(session_id: str) -> InMemoryChatMessageHistory:
     """
     RunnableWithMessageHistory callback. Ensures a per-session
-    InMemoryChatMessageHistory keyed by config['configurable']['session_id'].
+    InMemoryChatMessageHistory keyed by session_id.
     """
-    cfg = (config or {}).get("configurable", {})
-    session_id = cfg.get("session_id")
     if not session_id:
         session_id = str(uuid.uuid4())
-        cfg["session_id"] = session_id
-        config["configurable"] = cfg
 
     if session_id not in _session_store:
         _session_store[session_id] = InMemoryChatMessageHistory()
@@ -174,13 +199,25 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
+# Create LangChain tools
+langchain_tools = create_langchain_tools(tavily_client)
+
+# Enhanced LLM with tools (if available)
+if langchain_tools:
+    llm_with_tools = llm.bind_tools(langchain_tools)
+    logger.info(f"LangChain agent enhanced with {len(langchain_tools)} tools")
+else:
+    llm_with_tools = llm
+    logger.info("LangChain agent running without additional tools")
+
 # Base runnable and history wrapper
-_base_chain = prompt | llm
+_base_chain = prompt | llm_with_tools
 chain = RunnableWithMessageHistory(
     _base_chain,
     _history_factory,
     input_messages_key="input",
     history_messages_key="history",
+    get_session_id=lambda config: config["configurable"]["session_id"]
 )
 
 # ─── REQUEST MODEL ────────────────────────────────────────────────────────────
@@ -219,6 +256,12 @@ class AppointmentRequest(BaseModel):
     consultation_type: str  # custom_design, appraisal, selection
     message: Optional[str] = None
 
+class SearchRequest(BaseModel):
+    query: str = Field(..., max_length=500, min_length=1)
+    search_type: Optional[str] = Field("general", description="general, market, product, price, trends")
+    max_results: Optional[int] = Field(5, ge=1, le=10)
+    include_answer: Optional[bool] = True
+
 # ─── HEALTH CHECK ────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -231,10 +274,34 @@ async def health_check():
         # Test template loading
         template_healthy = os.path.exists(TEMPLATE_DIR) and os.path.exists(os.path.join(TEMPLATE_DIR, "widget.html"))
         
+        # Test GHL MCP connection
+        ghl_healthy = True
+        ghl_status = "disabled"
+        if ghl_client:
+            try:
+                test_response = ghl_client.test_connection()
+                ghl_healthy = test_response.success
+                ghl_status = "connected" if ghl_healthy else "connection_failed"
+            except Exception:
+                ghl_healthy = False
+                ghl_status = "error"
+        
+        # Test Tavily Search connection
+        tavily_healthy = True
+        tavily_status = "disabled"
+        if tavily_client:
+            try:
+                test_response = tavily_client.test_connection()
+                tavily_healthy = test_response.success
+                tavily_status = "connected" if tavily_healthy else "connection_failed"
+            except Exception:
+                tavily_healthy = False
+                tavily_status = "error"
+        
         # Memory usage check
         session_count = len(_session_store)
         
-        overall_status = "healthy" if all([llm_healthy, template_healthy]) else "degraded"
+        overall_status = "healthy" if all([llm_healthy, template_healthy, ghl_healthy or not ghl_client, tavily_healthy or not tavily_client]) else "degraded"
         
         return {
             "status": overall_status,
@@ -244,6 +311,8 @@ async def health_check():
             "checks": {
                 "llm_configured": llm_healthy,
                 "templates_loaded": template_healthy,
+                "ghl_mcp_status": ghl_status,
+                "tavily_search_status": tavily_status,
                 "active_sessions": session_count
             },
             "environment": {
@@ -354,13 +423,339 @@ async def clear_chat(request: Request, req: ClearChatRequest = None):
             content={"error": "Failed to clear chat history."}
         )
 
-# ─── JEWELRY-SPECIFIC ENDPOINTS ───────────────────────────────────────────────
+# ─── GHL CRM ENDPOINTS ──────────────────────────────────────────────────────
+
+@app.post("/crm/create-contact")
+async def create_crm_contact(contact: ContactModel):
+    """Create a new contact in GoHighLevel CRM"""
+    if not ghl_client:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "GHL CRM integration not available"}
+        )
+    
+    try:
+        response = ghl_client.create_contact(contact)
+        if response.success:
+            logger.info(f"Contact created successfully: {contact.email}")
+            return JSONResponse({
+                "success": True,
+                "contact_id": response.data.get("id") if response.data else None,
+                "message": "Contact created successfully"
+            })
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"error": response.error}
+            )
+    except Exception as e:
+        logger.error(f"Error creating CRM contact: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to create contact in CRM"}
+        )
+
+@app.post("/crm/schedule-appointment")
+async def schedule_jewelry_consultation(request: AppointmentRequest):
+    """Schedule appointment and create contact in GHL CRM"""
+    if not ghl_client:
+        # Fallback to direct appointment scheduling
+        return await schedule_consultation_fallback(request)
+    
+    try:
+        # First, create or update contact in CRM
+        contact = ContactModel(
+            firstName=request.customer_name.split(' ')[0] if ' ' in request.customer_name else request.customer_name,
+            lastName=' '.join(request.customer_name.split(' ')[1:]) if ' ' in request.customer_name else "",
+            email=request.email,
+            phone=request.phone,
+            tags=["Jewelry Consultation", "Website Lead", request.consultation_type.replace('_', ' ').title()]
+        )
+        
+        contact_response = ghl_client.upsert_contact(contact, email=request.email)
+        
+        if not contact_response.success:
+            logger.warning(f"Failed to create CRM contact: {contact_response.error}")
+            return await schedule_consultation_fallback(request)
+            
+        contact_id = contact_response.data.get("id") if contact_response.data else None
+        
+        # Create opportunity for jewelry consultation
+        if contact_id:
+            opportunity = OpportunityModel(
+                name=f"Jewelry Consultation - {request.customer_name}",
+                contactId=contact_id,
+                pipelineId="default",  # This should be configured based on your GHL setup
+                stageId="new_lead",    # This should be configured based on your GHL setup
+                monetaryValue=0.0,
+                status="active"
+            )
+            
+            # Note: You'll need to get the actual pipeline/stage IDs from GHL
+            pipelines_response = ghl_client.get_pipelines()
+            if pipelines_response.success and pipelines_response.data:
+                # Use the first available pipeline for demo purposes
+                pipelines = pipelines_response.data.get("pipelines", [])
+                if pipelines:
+                    opportunity.pipelineId = pipelines[0].get("id")
+                    stages = pipelines[0].get("stages", [])
+                    if stages:
+                        opportunity.stageId = stages[0].get("id")
+        
+        # Send confirmation message if messaging is available
+        if contact_id:
+            try:
+                message = MessageModel(
+                    conversationId=contact_id,  # This might need adjustment based on GHL structure
+                    message=f"Thank you for scheduling a {request.consultation_type.replace('_', ' ')} consultation at Brax Fine Jewelers. We'll contact you within 24 hours to confirm your appointment for {request.preferred_date}.",
+                    type="SMS"
+                )
+                ghl_client.send_message(message)
+            except Exception as msg_error:
+                logger.warning(f"Failed to send confirmation message: {msg_error}")
+        
+        appointment_data = {
+            "appointment_id": f"BRAX-{request.customer_name[:3].upper()}-{contact_id or '001'}",
+            "customer": request.customer_name,
+            "email": request.email,
+            "phone": request.phone,
+            "date": request.preferred_date,
+            "type": request.consultation_type,
+            "status": "pending_confirmation",
+            "crm_contact_id": contact_id,
+            "message": "Thank you for scheduling with Brax Fine Jewelers. We'll contact you within 24 hours to confirm your appointment."
+        }
+        
+        return JSONResponse(appointment_data)
+        
+    except Exception as e:
+        logger.error(f"Error in CRM appointment scheduling: {e}", exc_info=True)
+        return await schedule_consultation_fallback(request)
+
+async def schedule_consultation_fallback(request: AppointmentRequest):
+    """Fallback appointment scheduling without CRM integration"""
+    try:
+        appointment_data = {
+            "appointment_id": f"BRAX-{request.customer_name[:3].upper()}-FALLBACK",
+            "customer": request.customer_name,
+            "email": request.email,
+            "phone": request.phone,
+            "date": request.preferred_date,
+            "type": request.consultation_type,
+            "status": "pending_confirmation",
+            "message": "Thank you for scheduling with Brax Fine Jewelers. We'll contact you within 24 hours to confirm your appointment."
+        }
+        return JSONResponse(appointment_data)
+    except Exception as e:
+        logger.error(f"Error in fallback appointment scheduling: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to schedule appointment. Please call (949) 250-9949."}
+        )
+
+@app.get("/crm/contacts")
+async def get_crm_contacts(limit: int = 20, offset: int = 0, query: str = None):
+    """Get contacts from GHL CRM"""
+    if not ghl_client:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "GHL CRM integration not available"}
+        )
+    
+    try:
+        response = ghl_client.get_contacts(limit=limit, offset=offset, query=query)
+        if response.success:
+            return JSONResponse(response.data)
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"error": response.error}
+            )
+    except Exception as e:
+        logger.error(f"Error fetching CRM contacts: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to fetch contacts from CRM"}
+        )
+
+@app.get("/crm/opportunities")
+async def get_crm_opportunities(contact_id: str = None, limit: int = 20, offset: int = 0):
+    """Get opportunities from GHL CRM"""
+    if not ghl_client:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "GHL CRM integration not available"}
+        )
+    
+    try:
+        response = ghl_client.search_opportunity(
+            contact_id=contact_id, 
+            limit=limit, 
+            offset=offset
+        )
+        if response.success:
+            return JSONResponse(response.data)
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"error": response.error}
+            )
+    except Exception as e:
+        logger.error(f"Error fetching CRM opportunities: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to fetch opportunities from CRM"}
+        )
+
+# ─── WEB SEARCH ENDPOINTS ────────────────────────────────────────────────────
+
+@app.post("/search")
+@limiter.limit("10/minute")  # 10 searches per minute per IP
+async def web_search(request: Request, search_req: SearchRequest):
+    """Perform web search using Tavily API for jewelry-related queries"""
+    if not tavily_client:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Web search service not available"}
+        )
+    
+    try:
+        # Route to specialized search methods based on search type
+        if search_req.search_type == "market":
+            response = tavily_client.jewelry_market_search(search_req.query)
+        elif search_req.search_type == "product":
+            response = tavily_client.product_research(search_req.query)
+        elif search_req.search_type == "price":
+            response = tavily_client.price_comparison(search_req.query)
+        elif search_req.search_type == "trends":
+            response = tavily_client.trend_analysis(search_req.query)
+        else:
+            # General search
+            response = tavily_client.search(
+                query=search_req.query,
+                max_results=search_req.max_results,
+                include_answer=search_req.include_answer
+            )
+        
+        if response.success:
+            logger.info(f"Web search successful: {search_req.query} ({search_req.search_type})")
+            return JSONResponse({
+                "success": True,
+                "query": response.query,
+                "answer": response.answer,
+                "results": [
+                    {
+                        "title": result.title,
+                        "url": result.url,
+                        "content": result.content[:500],  # Limit content length
+                        "score": result.score
+                    }
+                    for result in response.results
+                ],
+                "follow_up_questions": response.follow_up_questions,
+                "search_time": response.search_time,
+                "search_type": search_req.search_type
+            })
+        else:
+            logger.warning(f"Web search failed: {response.error}")
+            return JSONResponse(
+                status_code=400,
+                content={"error": response.error}
+            )
+    
+    except Exception as e:
+        logger.error(f"Error in web search: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to perform web search"}
+        )
+
+@app.get("/search/jewelry-trends")
+async def get_jewelry_trends(category: str = "engagement rings"):
+    """Get current jewelry trends for a specific category"""
+    if not tavily_client:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Web search service not available"}
+        )
+    
+    try:
+        response = tavily_client.trend_analysis(category)
+        
+        if response.success:
+            return JSONResponse({
+                "category": category,
+                "trends_summary": response.answer,
+                "key_trends": [result.title for result in response.results[:5]],
+                "sources": [
+                    {"title": result.title, "url": result.url}
+                    for result in response.results[:3]
+                ],
+                "updated": datetime.utcnow().isoformat()
+            })
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"error": response.error}
+            )
+    
+    except Exception as e:
+        logger.error(f"Error fetching jewelry trends: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to fetch jewelry trends"}
+        )
+
+@app.get("/search/market-info")
+async def get_market_info(query: str):
+    """Get jewelry market information and pricing insights"""
+    if not tavily_client:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Web search service not available"}
+        )
+    
+    try:
+        response = tavily_client.jewelry_market_search(query)
+        
+        if response.success:
+            return JSONResponse({
+                "query": query,
+                "market_summary": response.answer,
+                "insights": [
+                    {
+                        "source": result.title,
+                        "insight": result.content[:300],
+                        "url": result.url
+                    }
+                    for result in response.results[:4]
+                ],
+                "related_questions": response.follow_up_questions,
+                "search_time": response.search_time
+            })
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"error": response.error}
+            )
+    
+    except Exception as e:
+        logger.error(f"Error fetching market info: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unable to fetch market information"}
+        )
+
+# ─── LEGACY JEWELRY ENDPOINTS (Deprecated) ──────────────────────────────────
 
 @app.post("/jewelry/recommend")
 async def recommend_jewelry(request: JewelryRequest):
-    """Recommend jewelry pieces based on occasion, budget, and style preferences"""
+    """
+    DEPRECATED: Legacy jewelry recommendation endpoint
+    Use /crm/create-contact and /crm/schedule-appointment instead
+    """
+    logger.warning("Using deprecated /jewelry/recommend endpoint")
     try:
-        # This would integrate with Brax inventory system
         recommendations = {
             "occasion": request.occasion,
             "recommendations": [
@@ -378,11 +773,13 @@ async def recommend_jewelry(request: JewelryRequest):
                     "description": "Inspired by 1920s glamour with intricate details",
                     "image_url": "/images/art-deco-collection.jpg",
                 },
-            ]
+            ],
+            "deprecated": True,
+            "migration_note": "This endpoint is deprecated. Please use /crm/create-contact for lead capture."
         }
         return JSONResponse(recommendations)
     except Exception as e:
-        logger.error(f"Error in jewelry recommendations: {e}", exc_info=True)
+        logger.error(f"Error in legacy jewelry recommendations: {e}", exc_info=True)
         return JSONResponse(
             status_code=500,
             content={"error": "Unable to process jewelry recommendation request."}
@@ -390,32 +787,19 @@ async def recommend_jewelry(request: JewelryRequest):
 
 @app.post("/appointment/schedule")
 async def schedule_consultation(request: AppointmentRequest):
-    """Schedule an in-person jewelry consultation"""
-    try:
-        # This would integrate with Brax appointment system
-        appointment_data = {
-            "appointment_id": f"BRAX-{request.customer_name[:3].upper()}-001",
-            "customer": request.customer_name,
-            "email": request.email,
-            "phone": request.phone,
-            "date": request.preferred_date,
-            "type": request.consultation_type,
-            "status": "pending_confirmation",
-            "message": "Thank you for scheduling with Brax Fine Jewelers. We'll contact you within 24 hours to confirm your appointment."
-        }
-        return JSONResponse(appointment_data)
-    except Exception as e:
-        logger.error(f"Error scheduling appointment: {e}", exc_info=True)
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Unable to schedule appointment. Please call (949) 250-9949."}
-        )
+    """
+    DEPRECATED: Use /crm/schedule-appointment instead
+    """
+    logger.warning("Using deprecated /appointment/schedule endpoint")
+    return await schedule_consultation_fallback(request)
 
 @app.get("/inventory/search")
 async def search_inventory(query: str, budget_min: Optional[float] = None, budget_max: Optional[float] = None):
-    """Search Brax inventory based on criteria"""
+    """
+    DEPRECATED: Legacy inventory search
+    """
+    logger.warning("Using deprecated /inventory/search endpoint")
     try:
-        # This would integrate with Brax inventory database
         search_results = {
             "query": query,
             "budget_range": f"${budget_min or 0} - ${budget_max or 'No limit'}",
@@ -429,10 +813,12 @@ async def search_inventory(query: str, budget_min: Optional[float] = None, budge
                 }
             ],
             "total_count": 1,
+            "deprecated": True,
+            "migration_note": "This endpoint is deprecated. Contact information should be captured via /crm/create-contact."
         }
         return JSONResponse(search_results)
     except Exception as e:
-        logger.error(f"Error searching inventory: {e}", exc_info=True)
+        logger.error(f"Error in legacy inventory search: {e}", exc_info=True)
         return JSONResponse(
             status_code=500,
             content={"error": "Unable to search inventory at this time."}
